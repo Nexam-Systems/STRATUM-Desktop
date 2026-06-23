@@ -1,0 +1,118 @@
+name: CI Build (Windows / MSVC / Qt)
+
+# Continuous build verification for development branches and PRs. A green run
+# proves the branch compiles on the SAME toolchain as BUILD-Windows.md:
+# MSVC 2022 (v143) + Qt 6.10.3 + Ninja, driven by qt-cmake.
+#
+# Release artifacts are handled separately by build-on-tag.yml (fires on v* tags).
+# This workflow is the fast feedback loop: push a branch -> get a build result.
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'flyview-web/**'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'flyview-web/**'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+
+concurrency:
+  group: ci-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep aligned with qgroundcontrol/build-config.json and BUILD-Windows.md.
+  QT_VERSION: '6.10.3'
+  QT_ARCH: 'win64_msvc2022_64'
+
+jobs:
+  build-windows:
+    runs-on: windows-2022          # ships Visual Studio 2022 (v143)
+    timeout-minutes: 120           # QGC is a large tree; first configure is slow
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Monorepo: QGC is vendored as ordinary files, no submodules to fetch.
+          submodules: false
+          fetch-depth: 0           # full history so version describe works
+
+      - name: Set up MSVC (cl.exe on PATH)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Install Qt ${{ env.QT_VERSION }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ env.QT_ARCH }}
+          # Authoritative module set from qgroundcontrol/.github/build-config.json
+          # ("qt_modules") — exactly what QGC's own CI installs. Keep in sync if
+          # you bump the vendored QGC tree.
+          modules: >-
+            qtgraphs
+            qtlocation
+            qtpositioning
+            qtspeech
+            qtmultimedia
+            qtserialport
+            qtimageformats
+            qtshadertools
+            qtconnectivity
+            qtquick3d
+            qtsensors
+            qtscxml
+            qtwebsockets
+            qthttpserver
+          cache: true
+
+      - name: Configure (qt-cmake + Ninja)
+        working-directory: qgroundcontrol
+        shell: cmd
+        run: >-
+          "%QT_ROOT_DIR%\bin\qt-cmake.bat" -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ github.event.inputs.build_type || 'Release' }}
+          -DQGC_BUILD_TESTING=OFF
+
+      - name: Build
+        working-directory: qgroundcontrol
+        shell: cmd
+        run: cmake --build build --parallel
+
+      # The build succeeding IS the verification. Below publishes the result.
+      - name: Locate built executable
+        id: findexe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path qgroundcontrol\build -Recurse -Filter QGroundControl.exe |
+                 Select-Object -First 1
+          if (-not $exe) { Write-Error "QGroundControl.exe not found"; exit 1 }
+          "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Built: $($exe.FullName)"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QGroundControl-${{ github.ref_name }}-${{ github.run_number }}
+          path: ${{ steps.findexe.outputs.exe_path }}
+          if-no-files-found: error
+          retention-days: 7

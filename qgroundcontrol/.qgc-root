@@ -1,0 +1,4 @@
+# STRATUM marker: identifies the vendored QGroundControl source-tree root.
+# QGC developer tooling (tools/common/file_traversal.py:find_repo_root) anchors
+# on this file so that, inside the STRATUM-Desktop monorepo, the QGC root is
+# resolved here rather than at the outer repo's .git. Do not delete.

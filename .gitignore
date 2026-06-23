@@ -1,11 +1,16 @@
 # ── STRATUM-Desktop .gitignore ───────────────────────────────────────────────
-# Your repo versions STRATUM-specific source + docs. QGC is a submodule (its own
-# .gitignore governs its tree). Build outputs and dependencies are never committed.
+# Monorepo: STRATUM-specific source + docs + the vendored QGC tree. Build
+# outputs and fetched dependencies are never committed.
+
+# Dependency / build caches (CPM downloads carry nested .git dirs — never track)
+**/.cache/
+qgroundcontrol/.cache/
 
 # Qt / CMake / build trees
 /build/
 /build-*/
 **/build/
+qgroundcontrol/build/
 **/*.user
 **/*.autosave
 CMakeCache.txt

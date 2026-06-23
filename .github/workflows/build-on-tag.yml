@@ -24,10 +24,13 @@ jobs:
     timeout-minutes: 120           # QGC is a large tree; first configure is slow
 
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive    # pulls qgroundcontrol + its own nested submodules
+          # Hard fork: QGC source is vendored as ordinary files in this repo.
+          # There is NO submodule. Pulling one here would have fetched pristine
+          # upstream QGC and dropped all STRATUM branding/AOP work ("no branding").
+          submodules: false
           fetch-depth: 0           # full history so the tag/describe works
 
       - name: Set up MSVC (cl.exe on PATH)
@@ -45,7 +48,7 @@ jobs:
           arch: ${{ env.QT_ARCH }}
           # Authoritative list copied verbatim from qgroundcontrol/.github/build-config.json
           # ("qt_modules"). This is exactly what QGC's own CI installs — keep it in sync
-          # if you ever bump the submodule.
+          # if you ever update the vendored QGC tree.
           modules: >-
             qtgraphs
             qtlocation
