@@ -43,19 +43,24 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ env.QT_ARCH }}
-          # QGC pulls a broad module set. Trim/extend to match what your tree needs;
-          # an unused module costs download time, a missing one fails configure.
+          # Authoritative list copied verbatim from qgroundcontrol/.github/build-config.json
+          # ("qt_modules"). This is exactly what QGC's own CI installs — keep it in sync
+          # if you ever bump the submodule.
           modules: >-
-            qtcharts
-            qtconnectivity
+            qtgraphs
             qtlocation
-            qtmultimedia
             qtpositioning
+            qtspeech
+            qtmultimedia
+            qtserialport
+            qtimageformats
+            qtshadertools
+            qtconnectivity
             qtquick3d
             qtsensors
-            qtserialport
-            qtshadertools
-            qt5compat
+            qtscxml
+            qtwebsockets
+            qthttpserver
           cache: true              # cache the Qt install between runs
 
       - name: Configure (qt-cmake + Ninja)
