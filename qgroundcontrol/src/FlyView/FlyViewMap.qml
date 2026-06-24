@@ -40,6 +40,11 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
+    // STRATUM: viewport rect used to seed the initial AOP polygon in the centre
+    // of the visible map. FlyViewMap (unlike PlanView's editorMap) does not
+    // declare a centerViewport, so define one here over the full map area.
+    property rect   centerViewport:             Qt.rect(0, 0, width, height)
+
     // STRATUM: Area-Of-Operations (AOP) edit state. When true the inclusion
     // geofence polygon becomes interactive (draggable vertices, add/remove)
     // and the Apply/Cancel bar is shown. The AOP is a polygon inclusion fence.
