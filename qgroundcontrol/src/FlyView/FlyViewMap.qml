@@ -78,10 +78,14 @@ FlightMap {
         for (var i = 0; i < _geoFenceController.polygons.count; i++) {
             _geoFenceController.polygons.get(i).interactive = false
         }
+        // STRATUM: leave edit mode and drop interactivity BEFORE the upload. If
+        // sendToVehicle() ever fails (rejected geofence, no link), the view must
+        // still unwind — otherwise _aopEditMode stays true and the map-click guard
+        // permanently suppresses the guided-action ("Go here") panel.
+        _aopEditMode = false
         if (QGroundControl.multiVehicleManager.activeVehicle) {
             _geoFenceController.sendToVehicle()
         }
-        _aopEditMode = false
     }
 
     // Abandon edits. If a vehicle is connected, restore the boundary it holds;
@@ -92,10 +96,10 @@ FlightMap {
             return
         }
         _geoFenceController.clearAllInteractive()
+        _aopEditMode = false
         if (QGroundControl.multiVehicleManager.activeVehicle) {
             _geoFenceController.loadFromVehicle()
         }
-        _aopEditMode = false
     }
 
     function _adjustMapZoomForPipMode() {
