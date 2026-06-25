@@ -80,6 +80,39 @@ Item {
         }
     }
 
+    // STRATUM: ENGAGING! indicator. Blinks while an engagement (terminal dive) is armed
+    // or in progress, so the operator can see the vehicle is in engagement mode.
+    Rectangle {
+        id:                         engagingIndicator
+        z:                          QGroundControl.zOrderTopMost
+        anchors.horizontalCenter:   parent.horizontalCenter
+        anchors.top:                parent.top
+        anchors.topMargin:          parentToolInsets.topEdgeCenterInset + _toolsMargin * 2
+        radius:                     _margins
+        color:                      qgcPal.window
+        border.color:               qgcPal.colorRed
+        border.width:               2
+        width:                      engagingLabel.implicitWidth + _toolsMargin * 4
+        height:                     engagingLabel.implicitHeight + _toolsMargin * 2
+        visible:                    mapControl && mapControl.engaging
+
+        QGCLabel {
+            id:                 engagingLabel
+            anchors.centerIn:   parent
+            text:               qsTr("ENGAGING!")
+            font.bold:          true
+            font.pointSize:     ScreenTools.mediumFontPointSize
+            color:              qgcPal.colorRed
+        }
+
+        SequentialAnimation on opacity {
+            running:    engagingIndicator.visible
+            loops:      Animation.Infinite
+            NumberAnimation { to: 0.25; duration: 450 }
+            NumberAnimation { to: 1.0;  duration: 450 }
+        }
+    }
+
     QGCToolInsets {
         id:                     _totalToolInsets
         leftEdgeTopInset:       toolStrip.leftEdgeTopInset
@@ -201,6 +234,9 @@ Item {
 
         // STRATUM: enter Area-Of-Operations edit mode on the single Fly map.
         onDefineAOP: mapControl.startAOPEdit()
+
+        // STRATUM: open the Engage (terminal dive) dialog on the standoff controller.
+        onEngage: mapControl.showEngageDialog()
 
         property real topEdgeLeftInset:     visible ? y + height : 0
         property real leftEdgeTopInset:     visible ? x + width : 0

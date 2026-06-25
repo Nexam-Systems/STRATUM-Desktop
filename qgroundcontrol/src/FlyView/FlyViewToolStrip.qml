@@ -17,12 +17,14 @@ ToolStrip {
 
     signal displayPreFlightChecklist
     signal defineAOP
+    signal engage
 
     FlyViewToolStripActionList {
         id: flyViewToolStripActionList
 
         onDisplayPreFlightChecklist: _root.displayPreFlightChecklist()
         onDefineAOP:                 _root.defineAOP()
+        onEngage:                    _root.engage()
     }
 
     model: flyViewToolStripActionList.model

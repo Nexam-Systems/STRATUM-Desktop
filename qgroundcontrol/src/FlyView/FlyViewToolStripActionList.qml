@@ -9,6 +9,7 @@ ToolStripActionList {
 
     signal displayPreFlightChecklist
     signal defineAOP
+    signal engage
 
     // STRATUM: focused command strip - AOP, the in-scope flight commands, the two
     // surfaced guided adjustments (Altitude, Max Speed), and Engage. The full flight
@@ -22,6 +23,6 @@ ToolStripActionList {
         GuidedActionLand { },
         GuidedActionChangeAltitude { },
         GuidedActionChangeSpeed { },        // Max Speed
-        EngageAction { }
+        EngageAction { onTriggered: engage() }
     ]
 }

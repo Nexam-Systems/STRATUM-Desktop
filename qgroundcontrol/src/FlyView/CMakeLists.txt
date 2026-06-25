@@ -41,6 +41,7 @@ qt_add_qml_module(FlyViewModule
         FlyViewVideo.qml
         FlyViewWidgetLayer.qml
         EngageAction.qml
+        EngageDialog.qml
         GuidedActionChangeAltitude.qml
         GuidedActionChangeSpeed.qml
         GuidedActionConfirm.qml
