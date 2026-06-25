@@ -31,12 +31,6 @@ Item {
     // on-map surveillance circle (centre = target, radius = standoff distance).
     property bool   _standoffActive:    false
 
-    // Engage (terminal dive) state.
-    property bool   _engaging:          false   // armed/diving — drives the ENGAGING! indicator
-    property bool   _awaitingDiveEntry: false   // repositioning to the dive-entry point
-    property var    _diveEntryPoint:    QtPositioning.coordinate()
-    property real   _engageAngleDeg:    45
-
     // Arrival tolerance scales gently with distance, floored for short standoffs.
     readonly property real _arrivalThresholdMeters: Math.max(5, _standoffDistance * 0.08)
 
@@ -62,63 +56,9 @@ Item {
         StandoffOrbitDialog { standoffController: root }
     }
 
-    QGCPopupDialogFactory {
-        id:              engageDialogFactory
-        dialogComponent: engageDialogComponent
-    }
-    Component {
-        id: engageDialogComponent
-        EngageDialog { standoffController: root }
-    }
-
-    // Open the Engage parameter dialog (validation lives in the dialog).
-    function showEngageDialog() {
-        engageDialogFactory.open()
-    }
-
-    // Reposition to the distance that yields the chosen dive angle for the current
-    // standoff height (D = height / tan(angle)), keeping the standoff bearing, then dive.
-    function beginEngage(angleDeg) {
-        if (!_activeVehicle || !_standoffActive || _standoffHeight <= 0) {
-            return
-        }
-        _engageAngleDeg = angleDeg
-        var requiredDistance = _standoffHeight / Math.tan(angleDeg * Math.PI / 180)
-        // Dive-entry point: on the same bearing from the target as the standoff, at the
-        // distance that makes the straight line to the target descend at angleDeg.
-        _diveEntryPoint = _targetCoordinate.atDistanceAndAzimuth(requiredDistance, _standoffAngle)
-
-        // Phase 1: reposition to the dive-entry point at standoff height, facing target.
-        var entryHeadingDeg = _diveEntryPoint.azimuthTo(_targetCoordinate)
-        _activeVehicle.guidedModeStandoff(_diveEntryPoint, _standoffAmslAltitude(), entryHeadingDeg)
-
-        _awaitingArrival   = false   // supersede any standoff-arrival wait
-        _awaitingDiveEntry = true
-        _engaging          = true    // ENGAGING! shown from the moment it is armed
-    }
-
-    // Phase 2: terminal dive onto the target at ground level (0 relative altitude).
-    function _executeDive() {
-        if (!_activeVehicle) {
-            return
-        }
-        var groundAmsl = _activeVehicle.homePosition.altitude   // 0 relative altitude
-        var diveHeadingDeg = _activeVehicle.coordinate.azimuthTo(_targetCoordinate)
-        _activeVehicle.guidedModeStandoff(_targetCoordinate, groundAmsl, diveHeadingDeg)
-        _awaitingDiveEntry = false
-        // _engaging stays true through the dive.
-    }
-
-    // Clear engagement state (e.g. when a fresh standoff is set up).
-    function cancelEngage() {
-        _engaging          = false
-        _awaitingDiveEntry = false
-    }
-
     // Open the parameter dialog for a freshly clicked target.
     function showStandoffDialog(targetCoordinate) {
         _awaitingArrival  = false
-        cancelEngage()                 // a new standoff clears any prior engagement
         _targetCoordinate = targetCoordinate
         standoffDialogFactory.open()
     }
@@ -176,30 +116,22 @@ Item {
         _standoffActive  = false
     }
 
-    // Arrival detection. Two phases share this: reaching the standoff point (apply final
-    // heading) and reaching the dive-entry point (commit the terminal dive). Read the
-    // live coordinate directly rather than relying on the notify signal argument.
+    // Arrival detection: when the vehicle reaches the standoff point, rotate to the final
+    // heading. Read the live coordinate directly rather than relying on the notify arg.
     Connections {
         target:  _activeVehicle
-        enabled: (root._awaitingArrival || root._awaitingDiveEntry) && _activeVehicle
+        enabled: root._awaitingArrival && _activeVehicle
 
         function onCoordinateChanged() {
-            if (!_activeVehicle) {
+            if (!root._awaitingArrival || !_activeVehicle) {
                 return
             }
-            if (root._awaitingArrival) {
-                if (_activeVehicle.coordinate.distanceTo(root._standoffPoint) <= root._arrivalThresholdMeters) {
-                    root._awaitingArrival = false
-                    // STRATUM: only now, at the standoff point, rotate to the final heading
-                    // (face the target). No orbit prompt — the operator switches to Orbit
-                    // from the flight-mode menu if desired; the circle stays visible.
-                    root._activeVehicle.guidedModeChangeHeading(root._targetCoordinate)
-                }
-            } else if (root._awaitingDiveEntry) {
-                if (_activeVehicle.coordinate.distanceTo(root._diveEntryPoint) <= root._arrivalThresholdMeters) {
-                    // Reached the dive-entry point — commit the terminal dive.
-                    root._executeDive()
-                }
+            if (_activeVehicle.coordinate.distanceTo(root._standoffPoint) <= root._arrivalThresholdMeters) {
+                root._awaitingArrival = false
+                // STRATUM: only now, at the standoff point, rotate to the final heading
+                // (face the target). No orbit prompt — the operator switches to Orbit
+                // from the flight-mode menu if desired; the circle stays visible.
+                root._activeVehicle.guidedModeChangeHeading(root._targetCoordinate)
             }
         }
     }

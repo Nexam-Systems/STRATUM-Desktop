@@ -696,15 +696,6 @@ FlightMap {
         guidedController:   globals.guidedControllerFlyView
     }
 
-    // STRATUM: true while an engagement (terminal dive) is armed/diving. Consumed by the
-    // ENGAGING! indicator on the widget overlay.
-    property bool engaging: standoffController._engaging
-
-    // STRATUM: open the Engage dialog (invoked from the command strip Engage button).
-    function showEngageDialog() {
-        standoffController.showEngageDialog()
-    }
-
     // STRATUM: standoff surveillance area. Crimson circle centred on the target,
     // radius = standoff distance, depicting the area under surveillance. Shown
     // whenever a standoff hold / orbit is active.
