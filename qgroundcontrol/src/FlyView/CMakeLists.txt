@@ -46,6 +46,7 @@ qt_add_qml_module(FlyViewModule
         GuidedActionRTL.qml
         GuidedActionsController.qml
         GuidedActionTakeoff.qml
+        GuidedActionTakeoffDialog.qml
         GuidedToolStripAction.qml
         GuidedValueSlider.qml
         MultiRotorChecklist.qml
@@ -65,6 +66,9 @@ qt_add_qml_module(FlyViewModule
         ProximityRadarValues.qml
         ProximityRadarVideoView.qml
         RoverChecklist.qml
+        StandoffController.qml
+        StandoffDialog.qml
+        StandoffOrbitDialog.qml
         SubChecklist.qml
         TelemetryValuesBar.qml
         TerrainProgress.qml

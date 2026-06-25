@@ -1,0 +1,15 @@
+# Place this file at:  C:\Users\<your-username>\.wslconfig
+# Then run in PowerShell:  wsl --shutdown   (restart WSL to apply)
+#
+# Mirrored networking lets WSL2 and Windows share localhost, so PX4 SITL's
+# default MAVLink broadcast reaches STRATUM-QGC on Windows with no manual link.
+
+[wsl2]
+networkingMode=mirrored
+# Optional: cap resources so Gazebo doesn't starve Windows.
+memory=8GB
+processors=4
+
+[experimental]
+# Auto-reclaim memory and allow Windows<->WSL localhost forwarding.
+hostAddressLoopback=true

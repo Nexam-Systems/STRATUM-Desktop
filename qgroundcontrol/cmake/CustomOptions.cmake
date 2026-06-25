@@ -14,7 +14,11 @@ set(QGC_CUSTOM_DIR "custom" CACHE STRING "Custom build overlay directory, relati
 # Application Metadata
 # ============================================================================
 
-set(QGC_APP_NAME "QGroundControl" CACHE STRING "Application name")
+# STRATUM: global product rename. Drives window title, settings space, save paths.
+set(QGC_APP_NAME "STRATUM" CACHE STRING "Application name")
+# STRATUM: dedicated product version, decoupled from upstream QGC git versioning.
+# Surfaced to QML via QGroundControl.stratumVersion and rendered in the window title.
+set(STRATUM_VERSION "0.1.0" CACHE STRING "STRATUM product version")
 string(TIMESTAMP _copyright_year "%Y")
 set(QGC_APP_COPYRIGHT "Copyright (c) ${_copyright_year} QGroundControl. All rights reserved." CACHE STRING "Copyright notice")
 set(QGC_APP_DESCRIPTION "Open Source Ground Control App" CACHE STRING "Application description")

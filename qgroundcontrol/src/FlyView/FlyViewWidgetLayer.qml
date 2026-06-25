@@ -130,6 +130,40 @@ Item {
         property real rightEdgeBottomInset:     width + _layoutMargin
     }
 
+    // STRATUM: Engage command button (placeholder). Intended to invoke a PX4 flight
+    // mode; the command wiring is deliberately deferred. It lives on the widget overlay
+    // so it is present in both map-over-video and video-over-map layouts, and its accent
+    // matches the left command strip (brandingPurple).
+    Rectangle {
+        id:                     engageButton
+        z:                      QGroundControl.zOrderWidgets
+        anchors.right:          parent.right
+        anchors.bottom:         bottomRightRowLayout.top
+        anchors.rightMargin:    _toolsMargin
+        anchors.bottomMargin:   _toolsMargin * 2
+        width:                  engageLabel.implicitWidth + ScreenTools.defaultFontPixelWidth * 4
+        height:                 ScreenTools.defaultFontPixelHeight * 2
+        radius:                 _margins
+        color:                  engageMouseArea.pressed ? Qt.darker(qgcPal.brandingPurple, 1.2) : qgcPal.brandingPurple
+        visible:                !QGroundControl.videoManager.fullScreen
+
+        QGCLabel {
+            id:                 engageLabel
+            anchors.centerIn:   parent
+            text:               qsTr("Engage")
+            color:              qgcPal.buttonHighlightText
+            font.bold:          true
+        }
+
+        MouseArea {
+            id:             engageMouseArea
+            anchors.fill:   parent
+            hoverEnabled:   true
+            // STRATUM: placeholder — PX4 flight-mode engagement to be wired in later.
+            onClicked:      { /* intentionally no-op for now */ }
+        }
+    }
+
     FlyViewMissionCompleteDialog {
         missionController:      _missionController
         geoFenceController:     _geoFenceController

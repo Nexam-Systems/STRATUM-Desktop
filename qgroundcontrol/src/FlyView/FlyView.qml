@@ -157,6 +157,82 @@ Item {
             visible:            false
         }
 
+        QGCPalette { id: qgcPal }
+
+        // STRATUM: guided-action confirm bar, relocated from the top toolbar to the
+        // bottom edge for ergonomic reach. Hosts the slide-to-confirm control used to
+        // accept guided / flight-mode command changes. The message display and its
+        // fade timer/animation are kept co-located in this same document so the
+        // GuidedActionConfirm internals resolve their ids exactly as before.
+        Item {
+            id:                         guidedActionConfirmBottomBar
+            anchors.bottom:             parent.bottom
+            anchors.bottomMargin:       _toolsMargin
+            anchors.horizontalCenter:   parent.horizontalCenter
+            width:                      guidedActionConfirmBottom.width + (_toolsMargin * 2)
+            height:                     ScreenTools.toolbarHeight
+            visible:                    guidedActionConfirmBottom.visible
+            z:                          QGroundControl.zOrderTopMost
+
+            Rectangle {
+                anchors.fill:   parent
+                color:          qgcPal.window
+                opacity:        0.85
+                radius:         ScreenTools.defaultBorderRadius
+            }
+
+            GuidedActionConfirm {
+                id:                 guidedActionConfirmBottom
+                anchors.centerIn:   parent
+                height:             parent.height
+                guidedController:   _guidedController
+                guidedValueSlider:  _guidedValueSlider
+                messageDisplay:     guidedActionMessageDisplay
+            }
+        }
+
+        // Message display floats just above the bottom confirm bar. Defined here (not
+        // inside GuidedActionConfirm) so it is not clipped and so messageFadeTimer /
+        // messageOpacityAnimation remain resolvable from the confirm control.
+        Rectangle {
+            id:                         guidedActionMessageDisplay
+            anchors.bottom:             guidedActionConfirmBottomBar.top
+            anchors.bottomMargin:       _margins
+            anchors.horizontalCenter:   guidedActionConfirmBottomBar.horizontalCenter
+            width:                      messageLabel.contentWidth + (_margins * 2)
+            height:                     messageLabel.contentHeight + (_margins * 2)
+            // Opacity is intentionally left unbound: GuidedActionConfirm drives it via
+            // messageFadeTimer / messageOpacityAnimation (fade out) and reset (back to 1).
+            color:                      qgcPal.windowTransparent
+            radius:                     ScreenTools.defaultBorderRadius
+            visible:                    guidedActionConfirmBottom.visible
+            z:                          QGroundControl.zOrderTopMost
+
+            QGCLabel {
+                id:         messageLabel
+                x:          _margins
+                y:          _margins
+                width:      ScreenTools.defaultFontPixelWidth * 30
+                wrapMode:   Text.WordWrap
+                text:       guidedActionConfirmBottom.message
+            }
+
+            PropertyAnimation {
+                id:         messageOpacityAnimation
+                target:     guidedActionMessageDisplay
+                property:   "opacity"
+                from:       1
+                to:         0
+                duration:   500
+            }
+
+            Timer {
+                id:             messageFadeTimer
+                interval:       4000
+                onTriggered:    messageOpacityAnimation.start()
+            }
+        }
+
         Loader {
             id:           viewer3DLoader
             z:            1

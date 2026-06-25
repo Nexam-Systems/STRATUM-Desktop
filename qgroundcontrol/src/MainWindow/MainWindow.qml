@@ -17,6 +17,9 @@ import QGroundControl.Toolbar
 ApplicationWindow {
     id:         mainWindow
     visible:    true
+    // STRATUM: window title is the product name + product version, independent of
+    // the internal applicationName (which may carry a "Daily" settings-space suffix).
+    title:      qsTr("STRATUM v%1").arg(QGroundControl.stratumVersion)
     // The special casing for android prevents white bars from showing up on the edges of the screen with newer android versions
     flags:      Qt.Window | (ScreenTools.isAndroid ? Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : 0)
 

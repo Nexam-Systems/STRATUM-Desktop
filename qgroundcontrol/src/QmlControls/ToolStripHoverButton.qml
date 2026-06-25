@@ -27,6 +27,9 @@ Button {
     property bool forceImageScale11: false
     property real imageScale:        forceImageScale11 && (text == "") ? 0.8 : 0.6
     property real contentMargins:    innerText.height * 0.1
+    // STRATUM: when true, idle buttons carry a solid accent fill so they read as
+    // discrete command buttons rather than transparent icon affordances.
+    property bool accentButtons:     false
 
     property color _currentContentColor:  (checked || pressed) ? qgcPal.buttonHighlightText : qgcPal.text
     property color _currentContentColorSecondary:  (checked || pressed) ? qgcPal.text : qgcPal.buttonHighlight
@@ -123,6 +126,10 @@ Button {
         id:     buttonBkRect
         color:  (control.checked || control.pressed) ?
                     qgcPal.buttonHighlight :
-                    ((control.enabled && control.hovered) ? qgcPal.toolStripHoverColor : "transparent")
+                    ((control.enabled && control.hovered) ? qgcPal.toolStripHoverColor :
+                        (control.accentButtons ? qgcPal.brandingPurple : "transparent"))
+        // STRATUM: dim the accent fill when the action is unavailable so disabled
+        // commands remain visibly inert rather than reading as armed.
+        opacity: (control.accentButtons && !control.enabled) ? 0.35 : 1.0
     }
 }

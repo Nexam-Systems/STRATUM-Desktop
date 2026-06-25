@@ -89,6 +89,7 @@ public:
     Q_PROPERTY(QString  telemetryFileExtension  READ telemetryFileExtension CONSTANT)
 
     Q_PROPERTY(QString qgcVersion       READ qgcVersion         CONSTANT)
+    Q_PROPERTY(QString stratumVersion   READ stratumVersion     CONSTANT) ///< STRATUM: product version, independent of QGC build version
     Q_PROPERTY(QString qgcAppDate       READ qgcAppDate         CONSTANT)
     Q_PROPERTY(bool    qgcDailyBuild    READ qgcDailyBuild      CONSTANT)
 
@@ -201,6 +202,7 @@ public:
     QString telemetryFileExtension  (void) const;
 
     static QString qgcVersion();
+    static QString stratumVersion() { return QStringLiteral(STRATUM_VERSION_STR); } ///< STRATUM: product version string
     static QString qgcAppDate() { return QGC_APP_DATE; }
 #ifdef QGC_DAILY_BUILD
     static bool qgcDailyBuild() { return true; }

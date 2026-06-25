@@ -373,6 +373,34 @@ Item {
         guidedValueSlider.visible = false
     }
 
+    // STRATUM: Takeoff is confirmed through a dedicated modal dialog (altitude entry +
+    // launch caution) rather than the inline slide-to-confirm bar. Vehicles that only
+    // support takeoff without an altitude skip straight to execution.
+    function showTakeoffDialog() {
+        closeAll()
+        if (!_activeVehicle) {
+            return
+        }
+        if (_activeVehicle.supports.guidedTakeoffWithAltitude) {
+            takeoffDialogFactory.open()
+        } else {
+            executeAction(actionTakeoff, undefined, 0, false)
+        }
+    }
+
+    QGCPopupDialogFactory {
+        id:              takeoffDialogFactory
+        dialogComponent: takeoffDialogComponent
+    }
+
+    Component {
+        id: takeoffDialogComponent
+
+        GuidedActionTakeoffDialog {
+            guidedController: _root
+        }
+    }
+
     // Called when an action is about to be executed in order to confirm
     function confirmAction(actionCode, actionData, mapIndicator) {
         var showImmediate = true

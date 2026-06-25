@@ -689,6 +689,13 @@ FlightMap {
         }
     }
 
+    // STRATUM: standoff command controller. Drives the standoff dialog, flies the
+    // vehicle to the computed standoff point, and prompts to orbit on arrival.
+    StandoffController {
+        id:                 standoffController
+        guidedController:   globals.guidedControllerFlyView
+    }
+
     QGCPopupDialogFactory {
         id: roiEditPositionDialogFactory
 
@@ -752,44 +759,18 @@ FlightMap {
                 ColumnLayout {
                     spacing: ScreenTools.defaultFontPixelWidth / 2
 
+                    // STRATUM: the legacy guided map actions (Go to location, Orbit at
+                    // location, ROI at location) are replaced by a single Standoff command.
+                    // The standoff dialog captures distance / height / angle, then the
+                    // StandoffController flies the vehicle to the computed standoff point
+                    // and offers to orbit on arrival.
                     QGCButton {
                         Layout.fillWidth:   true
-                        text:               qsTr("Go to location")
+                        text:               qsTr("Standoff here")
                         visible:            globals.guidedControllerFlyView.showGotoLocation
                         onClicked: {
                             mapClickDropPanel.close()
-                            gotoLocationItem.show(mapClickCoord)
-
-                            if ((_activeVehicle.flightMode == _activeVehicle.gotoFlightMode) && !_flyViewSettings.goToLocationRequiresConfirmInGuided.value) {
-                                if (globals.guidedControllerFlyView.executeAction(globals.guidedControllerFlyView.actionGoto, mapClickCoord)) {
-                                    gotoLocationItem.actionConfirmed() // Still need to call this to commit the new coordinate and radius
-                                } else {
-                                    gotoLocationItem.actionCancelled()
-                                }
-                            } else {
-                                globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionGoto, mapClickCoord, gotoLocationItem)
-                            }
-                        }
-                    }
-
-                    QGCButton {
-                        Layout.fillWidth:   true
-                        text:               qsTr("Orbit at location")
-                        visible:            globals.guidedControllerFlyView.showOrbit
-                        onClicked: {
-                            mapClickDropPanel.close()
-                            orbitMapCircle.show(mapClickCoord)
-                            globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionOrbit, mapClickCoord, orbitMapCircle)
-                        }
-                    }
-
-                    QGCButton {
-                        Layout.fillWidth:   true
-                        text:               qsTr("ROI at location")
-                        visible:            globals.guidedControllerFlyView.showROI
-                        onClicked: {
-                            mapClickDropPanel.close()
-                            globals.guidedControllerFlyView.executeAction(globals.guidedControllerFlyView.actionROI, mapClickCoord, 0, false)
+                            standoffController.showStandoffDialog(mapClickCoord)
                         }
                     }
 

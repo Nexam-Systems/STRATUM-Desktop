@@ -14,6 +14,7 @@ Rectangle {
     property alias  model:              repeater.model
     property real   maxHeight           ///< Maximum height for control, determines whether text is hidden to make control shorter
     property var    fontSize:           ScreenTools.smallFontPointSize
+    property bool   accentButtons:      false   ///< STRATUM: render idle buttons with accent fill (opt-in per toolstrip)
 
     property var _dropPanel: dropPanel
 
@@ -56,6 +57,7 @@ Rectangle {
                     radius:             ScreenTools.defaultFontPixelWidth / 2
                     fontPointSize:      _root.fontSize
                     toolStripAction:    modelData
+                    accentButtons:      _root.accentButtons
                     dropPanel:          _dropPanel
                     onDropped: (index) => _root.dropped(index)
 
