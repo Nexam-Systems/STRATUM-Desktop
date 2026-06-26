@@ -54,12 +54,27 @@ FlightMap {
     // viewport if none exists, then makes all fence polygons interactive.
     function startAOPEdit() {
         if (!_geoFenceController) {
+            console.log("STRATUM AOP: no geoFenceController; cannot start edit")
             return
         }
+        console.log("STRATUM AOP: startAOPEdit, existing polygons =", _geoFenceController.polygons.count)
         if (_geoFenceController.polygons.count === 0) {
-            var rect            = Qt.rect(centerViewport.x, centerViewport.y, centerViewport.width, centerViewport.height)
-            var topLeftCoord    = toCoordinate(Qt.point(rect.x + rect.width * 0.25, rect.y + rect.height * 0.25), false /* clipToViewPort */)
-            var bottomRightCoord= toCoordinate(Qt.point(rect.x + rect.width * 0.75, rect.y + rect.height * 0.75), false /* clipToViewPort */)
+            // STRATUM: seed the default AOP box from the map CENTRE using fixed metric
+            // offsets, NOT pixel->coordinate conversion. toCoordinate() returns an
+            // invalid coordinate whenever the 2D map is not the actively rendered
+            // surface (e.g. the 3D viewer is up) or has not yet been laid out. That
+            // invalid coord collapses addInclusionPolygon() to a zero-area, invisible
+            // polygon with no draggable handles - the AOP "draw tool not appearing"
+            // failure. The map centre is always valid as long as the map exists.
+            var center = _root.center
+            if (!center || !center.isValid) {
+                console.log("STRATUM AOP: map centre invalid; cannot seed polygon")
+                return
+            }
+            var halfBox          = 750  // metres; addInclusionPolygon insets this ~0.75
+            var topLeftCoord     = center.atDistanceAndAzimuth(halfBox, -90).atDistanceAndAzimuth(halfBox, 0)
+            var bottomRightCoord = center.atDistanceAndAzimuth(halfBox, 90).atDistanceAndAzimuth(halfBox, 180)
+            console.log("STRATUM AOP: seeding from centre", center, "TL", topLeftCoord, "BR", bottomRightCoord)
             _geoFenceController.addInclusionPolygon(topLeftCoord, bottomRightCoord)
         }
         for (var i = 0; i < _geoFenceController.polygons.count; i++) {
