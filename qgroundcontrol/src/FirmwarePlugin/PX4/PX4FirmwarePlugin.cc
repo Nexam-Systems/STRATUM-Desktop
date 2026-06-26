@@ -774,6 +774,29 @@ bool PX4FirmwarePlugin::hasGripper(const Vehicle* vehicle) const
 
 void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
 {
+    // STRATUM: this is called both with our static list (constructor) AND with the
+    // vehicle's dynamic list from the MAVLink AVAILABLE_MODES protocol (StandardModes).
+    // The dynamic path REPLACES the entire mode table, which would drop our hard-coded
+    // custom AUTO submodes (Standoff = sub_mode 20, Engagement = sub_mode 21) that the
+    // firmware reaches but does not advertise. Re-inject them up-front if absent so the
+    // classification loop and _updateFlightModeList treat them like any other mode:
+    // the status bar can name them, they show in the menu, and setFlightMode() finds them.
+    const struct { PX4CustomMode::Mode mode; const char *name; } stratumModes[] = {
+        { PX4CustomMode::AUTO_STANDOFF,   "Standoff"   },
+        { PX4CustomMode::AUTO_ENGAGEMENT, "Engagement" },
+    };
+    for (const auto &sm : stratumModes) {
+        bool present = false;
+        for (const auto &mode : modeList) {
+            if (mode.custom_mode == static_cast<uint32_t>(sm.mode)) { present = true; break; }
+        }
+        if (!present) {
+            // 4-arg ctor: name, custom_mode, canBeSet, advanced. The loop below sets the
+            // fixed-wing / multi-rotor flags so the mode shows on every airframe class.
+            modeList.append(FirmwareFlightMode{ tr(sm.name), static_cast<uint32_t>(sm.mode), true, false });
+        }
+    }
+
     for(auto &mode: modeList){
         PX4CustomMode::Mode cMode = static_cast<PX4CustomMode::Mode>(mode.custom_mode);
 
@@ -796,6 +819,8 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_READY        :
         case PX4CustomMode::AUTO_RTGS         :
         case PX4CustomMode::AUTO_TAKEOFF      :
+        case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
+        case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
             mode.multiRotor = true;
             break;
         case PX4CustomMode::POSCTL_ORBIT      :
@@ -825,6 +850,8 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_READY        :
         case PX4CustomMode::AUTO_RTGS         :
         case PX4CustomMode::AUTO_TAKEOFF      :
+        case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
+        case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
             mode.fixedWing = true;
             break;
         }
