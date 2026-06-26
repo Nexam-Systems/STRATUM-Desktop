@@ -27,6 +27,15 @@ MapQuickItem {
     property var    _map:           map
     property bool   _multiVehicle:  QGroundControl.multiVehicleManager.vehicles.count > 1
 
+    // STRATUM: state-accent tint for the vehicle icon. SINGLE SOURCE OF TRUTH - kept
+    // in lock-step with the identical mapping in FlyView/FlyViewToolStrip.qml (command
+    // strip accent). Engagement -> red, flying -> green, on the ground -> blue. ADSB
+    // traffic is never tinted.
+    property color  _stateTintColor:    (_adsbVehicle || !vehicle) ? "transparent" :
+                                            vehicle.flightMode === qsTr("Engagement") ? "#D32F2F" :
+                                                vehicle.flying ? "#43A047" : "#1E88E5"
+    property bool   _stateTintActive:   !_adsbVehicle && !!vehicle
+
     sourceItem: Item {
         id:         vehicleItem
         width:      vehicleIcon.width
@@ -119,6 +128,15 @@ MapQuickItem {
                 origin.x:       vehicleIcon.width  / 2
                 origin.y:       vehicleIcon.height / 2
                 angle:          isNaN(heading) ? 0 : heading
+            }
+
+            // STRATUM: recolour the icon to the live state tint (green/red/blue) while
+            // preserving the icon's shape and internal shading. layer.enabled is false
+            // for ADSB traffic and when no vehicle is bound, so those render untouched.
+            layer.enabled:  _root._stateTintActive
+            layer.effect: MultiEffect {
+                colorization:       1.0
+                colorizationColor:  _root._stateTintColor
             }
         }
 

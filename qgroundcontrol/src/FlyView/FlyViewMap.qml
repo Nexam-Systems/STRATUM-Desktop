@@ -40,46 +40,75 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
-    // STRATUM: viewport rect used to seed the initial AOP polygon in the centre
-    // of the visible map. FlyViewMap (unlike PlanView's editorMap) does not
-    // declare a centerViewport, so define one here over the full map area.
-    property rect   centerViewport:             Qt.rect(0, 0, width, height)
+    // STRATUM: usable map viewport. The TOP is inset below the STRATUM command
+    // toolbar. QGCMapPolygonVisuals anchors its editing toolbar (Basic / Circular /
+    // Trace / Load KML-SHP) at centerViewport.top; with a full-height rect that top
+    // is y=0, hiding those tools behind the toolbar overlay. Insetting fixes that and
+    // also keeps any default-polygon reset inside the visible area. FlyViewMap (unlike
+    // PlanView's editorMap) declares no centerViewport, so define one here.
+    property real   _aopTopInset:               (toolInsets ? toolInsets.topEdgeCenterInset : 0) + ScreenTools.defaultFontPixelHeight
+    property rect   centerViewport:             Qt.rect(0, _aopTopInset, width, height - _aopTopInset)
 
     // STRATUM: Area-Of-Operations (AOP) edit state. When true the inclusion
     // geofence polygon becomes interactive (draggable vertices, add/remove)
     // and the Apply/Cancel bar is shown. The AOP is a polygon inclusion fence.
     property bool   _aopEditMode:               false
 
-    // Enter AOP edit mode. Seeds a default inclusion polygon over the current
-    // viewport if none exists, then makes all fence polygons interactive.
+    // STRATUM: true when the fence model already holds an inclusion polygon with
+    // enough vertices to be a real, visible area. A connected vehicle whose fence is
+    // empty (or a zero-vertex placeholder) returns false, so we seed our own AOP
+    // rather than leave the operator with the edit bar and no shape.
+    function _hasUsableAOPPolygon() {
+        if (!_geoFenceController) {
+            return false
+        }
+        for (var i = 0; i < _geoFenceController.polygons.count; i++) {
+            var poly = _geoFenceController.polygons.get(i)
+            if (poly && poly.count >= 3) {
+                return true
+            }
+        }
+        return false
+    }
+
+    // STRATUM: seed the default AOP box from the map CENTRE using fixed metric
+    // offsets, NOT pixel->coordinate conversion. toCoordinate() returns an invalid
+    // coordinate whenever the 2D map is not the actively rendered surface (3D viewer
+    // up) or not yet laid out, which collapses addInclusionPolygon() to a zero-area,
+    // invisible polygon. The map centre is always valid while the map exists.
+    function _seedAOPPolygon() {
+        if (!_geoFenceController) {
+            return false
+        }
+        var center = _root.center
+        if (!center || !center.isValid) {
+            console.log("STRATUM AOP: map centre invalid; cannot seed polygon")
+            return false
+        }
+        var halfBox          = 750  // metres; addInclusionPolygon insets this ~0.75
+        var topLeftCoord     = center.atDistanceAndAzimuth(halfBox, -90).atDistanceAndAzimuth(halfBox, 0)
+        var bottomRightCoord = center.atDistanceAndAzimuth(halfBox, 90).atDistanceAndAzimuth(halfBox, 180)
+        _geoFenceController.addInclusionPolygon(topLeftCoord, bottomRightCoord)
+        return true
+    }
+
+    function _makeAOPPolygonsInteractive() {
+        for (var i = 0; i < _geoFenceController.polygons.count; i++) {
+            _geoFenceController.polygons.get(i).interactive = true
+        }
+    }
+
+    // Enter AOP edit mode. Seed a default inclusion polygon unless the vehicle/plan
+    // already holds a usable one, then make the fence polygons interactive.
     function startAOPEdit() {
         if (!_geoFenceController) {
             console.log("STRATUM AOP: no geoFenceController; cannot start edit")
             return
         }
-        console.log("STRATUM AOP: startAOPEdit, existing polygons =", _geoFenceController.polygons.count)
-        if (_geoFenceController.polygons.count === 0) {
-            // STRATUM: seed the default AOP box from the map CENTRE using fixed metric
-            // offsets, NOT pixel->coordinate conversion. toCoordinate() returns an
-            // invalid coordinate whenever the 2D map is not the actively rendered
-            // surface (e.g. the 3D viewer is up) or has not yet been laid out. That
-            // invalid coord collapses addInclusionPolygon() to a zero-area, invisible
-            // polygon with no draggable handles - the AOP "draw tool not appearing"
-            // failure. The map centre is always valid as long as the map exists.
-            var center = _root.center
-            if (!center || !center.isValid) {
-                console.log("STRATUM AOP: map centre invalid; cannot seed polygon")
-                return
-            }
-            var halfBox          = 750  // metres; addInclusionPolygon insets this ~0.75
-            var topLeftCoord     = center.atDistanceAndAzimuth(halfBox, -90).atDistanceAndAzimuth(halfBox, 0)
-            var bottomRightCoord = center.atDistanceAndAzimuth(halfBox, 90).atDistanceAndAzimuth(halfBox, 180)
-            console.log("STRATUM AOP: seeding from centre", center, "TL", topLeftCoord, "BR", bottomRightCoord)
-            _geoFenceController.addInclusionPolygon(topLeftCoord, bottomRightCoord)
+        if (!_hasUsableAOPPolygon()) {
+            _seedAOPPolygon()
         }
-        for (var i = 0; i < _geoFenceController.polygons.count; i++) {
-            _geoFenceController.polygons.get(i).interactive = true
-        }
+        _makeAOPPolygonsInteractive()
         _aopEditMode = true
     }
 
@@ -114,6 +143,36 @@ FlightMap {
         _aopEditMode = false
         if (QGroundControl.multiVehicleManager.activeVehicle) {
             _geoFenceController.loadFromVehicle()
+        }
+    }
+
+    // STRATUM: in the Fly view the GeoFenceController treats the CONNECTED vehicle as
+    // the source of truth and rebuilds the polygon model from the vehicle on every
+    // manager loadComplete (_setFenceFromManager -> clearAndDeleteContents). That
+    // silently destroys the client-seeded AOP polygon, so once a vehicle is connected
+    // the operator sees the edit bar but no shape. While AOP edit mode is active,
+    // re-seed whenever the model loses its usable polygon. Deferred through a 0ms timer
+    // so it runs AFTER the manager's clear+repopulate fully unwinds - this avoids
+    // re-entrancy and lets a real vehicle-held fence win over our default seed.
+    Connections {
+        target: _geoFenceController ? _geoFenceController.polygons : null
+        function onCountChanged() {
+            if (_root._aopEditMode) {
+                _aopReseedTimer.restart()
+            }
+        }
+    }
+
+    Timer {
+        id:         _aopReseedTimer
+        interval:   0
+        repeat:     false
+        onTriggered: {
+            if (_root._aopEditMode && !_hasUsableAOPPolygon()) {
+                if (_seedAOPPolygon()) {
+                    _makeAOPPolygonsInteractive()
+                }
+            }
         }
     }
 

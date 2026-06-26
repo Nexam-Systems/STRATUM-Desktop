@@ -30,10 +30,15 @@ Button {
     // STRATUM: when true, idle buttons carry a solid accent fill so they read as
     // discrete command buttons rather than transparent icon affordances.
     property bool accentButtons:     false
+    // STRATUM: accent fill + content colour, supplied by the owning ToolStrip so the
+    // strip can encode live vehicle state (green flying / red engagement / blue on
+    // ground) while keeping the olive default for the no-vehicle case.
+    property color accentColor:      qgcPal.brandingPurple
+    property color accentTextColor:  "#1A1A1A"
 
-    // STRATUM: on accent (olive) buttons the fill is light enough that dark text/icons
-    // read far better than white in every state (idle, hover, checked).
-    property color _currentContentColor:  accentButtons ? "#1A1A1A" :
+    // STRATUM: on accent buttons the content colour is paired with the fill by the
+    // caller (dark on the light olive default, white on the saturated state colours).
+    property color _currentContentColor:  accentButtons ? accentTextColor :
                                               ((checked || pressed) ? qgcPal.buttonHighlightText : qgcPal.text)
     property color _currentContentColorSecondary:  (checked || pressed) ? qgcPal.text : qgcPal.buttonHighlight
 
@@ -140,7 +145,7 @@ Button {
         color:  (control.checked || control.pressed) ?
                     qgcPal.buttonHighlight :
                     ((control.enabled && control.hovered) ? qgcPal.toolStripHoverColor :
-                        (control.accentButtons ? qgcPal.brandingPurple : "transparent"))
+                        (control.accentButtons ? control.accentColor : "transparent"))
         // STRATUM: dim the accent fill when the action is unavailable so disabled
         // commands remain visibly inert rather than reading as armed.
         opacity: (control.accentButtons && !control.enabled) ? 0.35 : 1.0

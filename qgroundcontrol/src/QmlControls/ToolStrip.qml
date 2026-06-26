@@ -15,6 +15,11 @@ Rectangle {
     property real   maxHeight           ///< Maximum height for control, determines whether text is hidden to make control shorter
     property var    fontSize:           ScreenTools.smallFontPointSize
     property bool   accentButtons:      false   ///< STRATUM: render idle buttons with accent fill (opt-in per toolstrip)
+    // STRATUM: fill + content colour for accent buttons. Default to the olive branding
+    // colour; callers (e.g. FlyViewToolStrip) override accentColor to encode live
+    // vehicle state - green flying, red engagement, blue on ground.
+    property color  accentColor:        qgcPal.brandingPurple
+    property color  accentTextColor:    "#1A1A1A"
 
     property var _dropPanel: dropPanel
 
@@ -58,6 +63,8 @@ Rectangle {
                     fontPointSize:      _root.fontSize
                     toolStripAction:    modelData
                     accentButtons:      _root.accentButtons
+                    accentColor:        _root.accentColor
+                    accentTextColor:    _root.accentTextColor
                     dropPanel:          _dropPanel
                     onDropped: (index) => _root.dropped(index)
 

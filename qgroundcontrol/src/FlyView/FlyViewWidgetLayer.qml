@@ -53,29 +53,59 @@ Item {
         color:                      qgcPal.window
         border.color:               qgcPal.groupBorder
         border.width:               1
-        width:                      aopBarRow.width + _toolsMargin * 4
-        height:                     aopBarRow.height + _toolsMargin * 2
+        width:                      aopBarColumn.width + _toolsMargin * 4
+        height:                     aopBarColumn.height + _toolsMargin * 2
 
-        RowLayout {
-            id:                 aopBarRow
+        ColumnLayout {
+            id:                 aopBarColumn
             anchors.centerIn:   parent
-            spacing:            _toolsMargin * 2
+            spacing:            _toolsMargin
 
-            QGCLabel {
-                text:       qsTr("Defining Area of Operations")
-                font.bold:  true
+            RowLayout {
+                id:                 aopBarRow
+                Layout.alignment:   Qt.AlignHCenter
+                spacing:            _toolsMargin * 2
+
+                QGCLabel {
+                    text:       qsTr("Defining Area of Operations")
+                    font.bold:  true
+                }
+
+                QGCButton {
+                    text:       qsTr("Cancel")
+                    onClicked:  mapControl.cancelAOPEdit()
+                }
+
+                QGCButton {
+                    text:       qsTr("Apply changes")
+                    primary:    true
+                    visible:    _activeVehicle !== null
+                    onClicked:  mapControl.applyAOPEdit()
+                }
             }
 
-            QGCButton {
-                text:       qsTr("Cancel")
-                onClicked:  mapControl.cancelAOPEdit()
-            }
+            // STRATUM: amber warning shown while no vehicle is connected. The AOP can
+            // be laid out offline, but it only commits as an inclusion geofence once a
+            // vehicle link exists - hence there is deliberately no Apply button above
+            // until a vehicle connects. This bar tells the operator exactly that.
+            Rectangle {
+                id:                 aopNoVehicleWarning
+                Layout.alignment:   Qt.AlignHCenter
+                visible:            _activeVehicle === null
+                width:              aopWarningLabel.width + _toolsMargin * 3
+                height:             aopWarningLabel.height + _toolsMargin * 1.5
+                radius:             _margins / 2
+                color:              "#F2C200"
 
-            QGCButton {
-                text:       qsTr("Apply changes")
-                primary:    true
-                visible:    _activeVehicle !== null
-                onClicked:  mapControl.applyAOPEdit()
+                QGCLabel {
+                    id:                     aopWarningLabel
+                    anchors.centerIn:       parent
+                    width:                  ScreenTools.defaultFontPixelWidth * 42
+                    wrapMode:               Text.WordWrap
+                    horizontalAlignment:    Text.AlignHCenter
+                    color:                  "black"
+                    text:                   qsTr("No vehicle connected. This AOP is being laid out locally and will be uploaded as an inclusion geofence once a vehicle is connected.")
+                }
             }
         }
     }
