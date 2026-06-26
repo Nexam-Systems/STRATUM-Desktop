@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  stratum.wxs - WiX v3 product authoring for the STRATUM MSI installer.
+
+  This file is the "decision layer" of the MSI. It does NOT enumerate the
+  payload (every Qt DLL, QML module, platform plugin); that file list is
+  harvested automatically at build time by WiX `heat` from the windeployqt
+  staging tree and emitted as payload.wxs (ComponentGroup "PayloadComponents").
+  Keeping the two separate means a change in Qt's deployed footprint never
+  requires editing this file - heat re-harvests, this stays stable.
+
+  Build pipeline (see .github/actions/package-windows):
+    1. cmake install step (prefix=staging) runs windeployqt into staging\bin
+    2. heat harvests the staging tree into ComponentGroup PayloadComponents
+    3. candle + light compile this file and payload.wxs into STRATUM-x64.msi
+
+  Required preprocessor vars (passed via candle -d):
+    PayloadDir    absolute path to the windeployqt staging tree
+    AppVersion    numeric MSI ProductVersion (a.b.c[.d], digits only)
+    Manufacturer  organization / publisher string
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <Product Id="*"
+           Name="STRATUM"
+           Language="1033"
+           Version="$(var.AppVersion)"
+           Manufacturer="$(var.Manufacturer)"
+           UpgradeCode="4AAAC057-87FF-4BC9-AC1A-824BDD2446E4">
+
+    <!-- InstallerVersion 500 = Windows Installer 5.0 (Win7+). x64 package. -->
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Platform="x64"
+             Description="STRATUM Ground Control Station"
+             Manufacturer="$(var.Manufacturer)" />
+
+    <!-- Major-upgrade strategy: a newer MSI fully replaces an older one.
+         Because component GUIDs are regenerated on every harvest, we must NOT
+         allow same-version side-by-side; major upgrade removes the old payload
+         first, sidestepping component-rules violations across versions. -->
+    <MajorUpgrade
+        AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of STRATUM is already installed. Setup will now exit." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="StratumIcon.ico" SourceFile="$(var.PayloadDir)\bin\STRATUM.exe" />
+    <Property Id="ARPPRODUCTICON" Value="StratumIcon.ico" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/Nexam-Systems/STRATUM-Desktop" />
+
+    <!-- Directory tree. The payload (heat, -dr INSTALLFOLDER) lands under
+         INSTALLFOLDER, reproducing the staging layout: INSTALLFOLDER\bin\STRATUM.exe
+         exactly mirrors the NSIS installer's $INSTDIR\bin\STRATUM.exe. -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="STRATUM" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="AppProgramMenuDir" Name="STRATUM" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <!-- Start Menu + Desktop shortcuts. Non-advertised, pointing at the real
+         path that the harvested payload installs to. -->
+    <DirectoryRef Id="AppProgramMenuDir">
+      <Component Id="AppShortcuts" Guid="7C9E6F1B-2D4A-4E83-9B61-0F5A3C8D21AA">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="STRATUM"
+                  Description="STRATUM Ground Control Station"
+                  Target="[INSTALLFOLDER]bin\STRATUM.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="StartMenuShortcutGpuCompat"
+                  Name="STRATUM (GPU Compatibility Mode)"
+                  Target="[INSTALLFOLDER]bin\STRATUM.exe"
+                  Arguments="-desktop"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="StartMenuShortcutGpuSafe"
+                  Name="STRATUM (GPU Safe Mode)"
+                  Target="[INSTALLFOLDER]bin\STRATUM.exe"
+                  Arguments="-swrast"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveAppProgramMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\$(var.Manufacturer)\STRATUM"
+                       Name="installed"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainFeature" Title="STRATUM" Level="1" Display="expand"
+             Description="STRATUM application and all required runtime dependencies.">
+      <ComponentGroupRef Id="PayloadComponents" />
+      <ComponentRef Id="AppShortcuts" />
+    </Feature>
+
+    <!-- Minimal install wizard with directory chooser. -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" />
+
+  </Product>
+</Wix>

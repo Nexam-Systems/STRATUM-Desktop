@@ -98,21 +98,36 @@ jobs:
         shell: cmd
         run: cmake --build build --parallel
 
-      # The build succeeding IS the verification. Below publishes the result.
-      - name: Locate built executable
-        id: findexe
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem -Path qgroundcontrol\build -Recurse -Filter STRATUM.exe |
-                 Select-Object -First 1
-          if (-not $exe) { Write-Error "STRATUM.exe not found"; exit 1 }
-          "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "Built: $($exe.FullName)"
+      # The build succeeding IS the verification. Below deploys all Qt
+      # dependencies and packages both installer formats (NSIS .exe + .msi),
+      # then publishes the bare exe and both installers.
+      - name: Package (deploy + NSIS + MSI)
+        id: package
+        uses: ./.github/actions/package-windows
+        with:
+          source-dir: qgroundcontrol
+          build-dir: build
 
-      - name: Upload build artifact
+      - name: Upload bare executable
         uses: actions/upload-artifact@v4
         with:
-          name: STRATUM-${{ github.ref_name }}-${{ github.run_number }}
-          path: ${{ steps.findexe.outputs.exe_path }}
+          name: STRATUM-exe-${{ github.ref_name }}-${{ github.run_number }}
+          path: ${{ steps.package.outputs.exe-path }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: STRATUM-installer-nsis-${{ github.ref_name }}-${{ github.run_number }}
+          path: ${{ steps.package.outputs.nsis-path }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload MSI installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: STRATUM-installer-msi-${{ github.ref_name }}-${{ github.run_number }}
+          path: ${{ steps.package.outputs.msi-path }}
           if-no-files-found: error
           retention-days: 7
