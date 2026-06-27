@@ -10,7 +10,10 @@ import QGroundControl.Controls
 //   * valid == 1  -> prominent count, one decimal, interpolated smoothly between the
 //                    ~5 Hz vehicle updates so it ticks down rather than stepping;
 //   * valid == 0  -> "COMPUTING…" (never a stale or zero number);
-//   * stream lost -> "SIGNAL LOST" (telemetryAvailable false) -- never a frozen value.
+//   * stream lost -> "COMPUTING…" too (telemetryAvailable false) -- never a frozen value.
+//     STRATUM: this used to read "SIGNAL LOST", which misleadingly implied an RC/datalink
+//     dropout; it is only the 42001 status-stream watchdog, so it now falls back to
+//     COMPUTING rather than alarming the operator about a link that is in fact up.
 // The abort control does NOT depend on any of this; the countdown is display-only.
 Item {
     id: root
@@ -59,7 +62,7 @@ Item {
                 return
             }
             if (!root._live) {
-                root.displayMode = 2            // stream lost -> stale
+                root.displayMode = 1            // STRATUM: stream stale -> "COMPUTING…", not "SIGNAL LOST"
                 return
             }
             if (root._valid && !isNaN(root._tti)) {
@@ -110,7 +113,7 @@ Item {
                     switch (root.displayMode) {
                     case 0:  return root.displayTTI.toFixed(1) + qsTr(" s")
                     case 1:  return qsTr("COMPUTING…")
-                    case 2:  return qsTr("SIGNAL LOST")
+                    case 2:  return qsTr("COMPUTING…")   // STRATUM: was "SIGNAL LOST" (misleading); kept for safety, never set
                     case 3:  return qsTr("TARGET LOST — RECOVERING")
                     default: return ""
                     }

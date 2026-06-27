@@ -58,10 +58,12 @@ Item {
         }
     }
 
-    MouseArea {
-        anchors.fill:   mainLayout
-        onClicked:      mainWindow.showIndicatorDrawer(drawerComponent, control)
-    }
+    // STRATUM: the flight-mode dropdown menu has been retired. The out-of-scope PX4 modes
+    // (Position, Altitude, Acro, Stabilized, Guided Course, etc.) are never used
+    // operationally; the in-scope flight commands are exposed as hold-to-confirm buttons
+    // on the Fly-view command strip instead. This label now shows the current mode only.
+    // The drawer components below are intentionally left unwired (no MouseArea to open
+    // them) so re-enabling the menu in a dev build is a one-line change.
 
     Component {
         id: drawerComponent

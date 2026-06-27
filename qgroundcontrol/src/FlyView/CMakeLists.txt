@@ -44,6 +44,7 @@ qt_add_qml_module(FlyViewModule
         FlyViewTopRightPanel.qml
         FlyViewVideo.qml
         FlyViewWidgetLayer.qml
+        GuidedActionAbort.qml
         GuidedActionChangeAltitude.qml
         GuidedActionChangeSpeed.qml
         GuidedActionConfirm.qml

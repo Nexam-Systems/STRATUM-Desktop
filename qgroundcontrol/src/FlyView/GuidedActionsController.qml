@@ -558,7 +558,9 @@ Item {
             confirmDialog.message = setEstimatorOriginMessage
             break
         case actionSetFlightMode:
-            confirmDialog.title = setFlightMode
+            // STRATUM: show the target mode on the hold-to-confirm button instead of the
+            // generic "Set Flight Mode", so the left-pane command buttons read naturally.
+            confirmDialog.title = actionData ? actionData : setFlightMode
             confirmDialog.message = setFlightModeMessage
             break
         case actionChangeHeading:

@@ -40,7 +40,36 @@ Item {
     // command abort to choose the recovery point. Never depends on a valid estimate.
     readonly property bool _abortEnabled: _engaged || _diving || _recover
 
-    visible:                    _engaged || _aborting || _diving || _recover
+    // STRATUM (Task 4): abort-complete confirmation. PX4 owns the recovery trajectory and,
+    // on reaching the recovery point, AUTO-SWITCHES the vehicle out of Abort into Hold.
+    // The GCS has no dedicated "abort done" telemetry (ENGAGEMENT_STATUS.state only covers
+    // INACTIVE/DIVE/RECOVER), so we infer completion from that Abort -> Hold mode
+    // transition and surface a brief "ABORTED — BACK TO STANDOFF" banner. If firmware ever
+    // stops auto-switching, this is the single place to instead command Hold here.
+    readonly property string _flightMode:   _activeVehicle ? _activeVehicle.flightMode : ""
+    readonly property string _abortModeName: engagementController ? engagementController.abortModeName : qsTr("Abort")
+    readonly property string _holdModeName:  _activeVehicle ? _activeVehicle.pauseFlightMode : qsTr("Hold")
+    property string _prevFlightMode: ""
+    property bool   _showRecovered:  false
+
+    Component.onCompleted: _prevFlightMode = _flightMode
+
+    on_FlightModeChanged: {
+        if (_prevFlightMode === _abortModeName && _flightMode === _holdModeName) {
+            _showRecovered = true
+            recoveredTimer.restart()
+        }
+        _prevFlightMode = _flightMode
+    }
+
+    Timer {
+        id:             recoveredTimer
+        interval:       5000
+        repeat:         false
+        onTriggered:    root._showRecovered = false
+    }
+
+    visible:                    _engaged || _aborting || _diving || _recover || _showRecovered
     implicitWidth:              panel.implicitWidth
     implicitHeight:             panel.implicitHeight
     anchors.horizontalCenter:   parent.horizontalCenter
@@ -120,6 +149,28 @@ Item {
                 id:                 abortingLabel
                 anchors.centerIn:   parent
                 text:               qsTr("ABORTING — RECOVERING")
+                color:              "white"
+                font.bold:          true
+                font.pointSize:     ScreenTools.mediumFontPointSize
+            }
+        }
+
+        // STRATUM (Task 4): transient "recovery complete" confirmation, shown for a few
+        // seconds once PX4 has auto-switched the vehicle from Abort back into Hold.
+        Rectangle {
+            Layout.alignment:   Qt.AlignHCenter
+            visible:            root._showRecovered
+            implicitWidth:      recoveredLabel.contentWidth + (ScreenTools.defaultFontPixelWidth * 4)
+            implicitHeight:     recoveredLabel.contentHeight + (ScreenTools.defaultFontPixelWidth * 2)
+            radius:             ScreenTools.defaultBorderRadius
+            color:              "#43A047"
+            border.color:       "white"
+            border.width:       2
+
+            QGCLabel {
+                id:                 recoveredLabel
+                anchors.centerIn:   parent
+                text:               qsTr("ABORTED — BACK TO STANDOFF")
                 color:              "white"
                 font.bold:          true
                 font.pointSize:     ScreenTools.mediumFontPointSize
