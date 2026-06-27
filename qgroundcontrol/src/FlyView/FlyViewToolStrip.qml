@@ -16,6 +16,7 @@ ToolStrip {
     width: ScreenTools.defaultFontPixelWidth * 9
 
     property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    property var engagementController    // STRATUM: forwarded to the Engage trigger
 
     QGCPalette { id: qgcPal }
 
@@ -34,6 +35,7 @@ ToolStrip {
     FlyViewToolStripActionList {
         id: flyViewToolStripActionList
 
+        engagementController:        _root.engagementController
         onDisplayPreFlightChecklist: _root.displayPreFlightChecklist()
         onDefineAOP:                 _root.defineAOP()
     }

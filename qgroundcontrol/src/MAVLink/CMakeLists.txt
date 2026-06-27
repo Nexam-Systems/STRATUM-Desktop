@@ -30,10 +30,30 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_
 
 message(STATUS "QGC: Building MAVLink")
 
+# STRATUM: drop our own dialect files into the fetched mavlink source tree before it
+# configures/generates.
+#   * stratum.xml  -- does `<include>all.xml</include>` and appends only STRATUM's
+#                     custom messages (e.g. ENGAGEMENT_STATUS / 42001). CRC parity
+#                     with the firmware is guaranteed by an identical field block
+#                     (verified: CRC_EXTRA = 18).
+#   * icarous.xml  -- patched copy that removes the unused ICAROUS_KINEMATIC_BANDS,
+#                     which upstream defines at id 42001 and which collides with
+#                     ENGAGEMENT_STATUS (icarous is pulled into "all" via
+#                     ardupilotmega). STRATUM never uses ICAROUS. Without this,
+#                     mavgen fails with "Duplicate message id 42001".
+# The upstream CPM pin stays otherwise untouched. QGC_MAVLINK_DIALECT is "stratum"
+# (CustomOptions.cmake). copy_if_different is idempotent across rebuilds.
+set(STRATUM_MAVLINK_DEF_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mavlink_definitions")
 CPMAddPackage(
     NAME mavlink
     GIT_REPOSITORY ${QGC_MAVLINK_GIT_REPO}
     GIT_TAG ${QGC_MAVLINK_GIT_TAG}
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STRATUM_MAVLINK_DEF_DIR}/stratum.xml"
+            "<SOURCE_DIR>/message_definitions/v1.0/stratum.xml"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STRATUM_MAVLINK_DEF_DIR}/icarous.xml"
+            "<SOURCE_DIR>/message_definitions/v1.0/icarous.xml"
     OPTIONS "MAVLINK_DIALECT ${QGC_MAVLINK_DIALECT}" "MAVLINK_VERSION ${QGC_MAVLINK_VERSION}"
 )
 

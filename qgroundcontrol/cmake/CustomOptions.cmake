@@ -100,7 +100,10 @@ option(QGC_ENABLE_QT_VIDEOSTREAMING "Enable QtMultimedia video backend" OFF)
 
 set(QGC_MAVLINK_GIT_REPO "https://github.com/mavlink/mavlink.git" CACHE STRING "MAVLink repository URL")
 set(QGC_MAVLINK_GIT_TAG "c409cf690454db6d3e004bd14173bc6c7ff1e0ff" CACHE STRING "MAVLink repository commit/tag")
-set(QGC_MAVLINK_DIALECT "all" CACHE STRING "MAVLink dialect")
+# STRATUM: use our own dialect (src/MAVLink/mavlink_definitions/stratum.xml, copied
+# into the fetched mavlink tree at build time). It `<include>all.xml</include>` so it
+# is a strict superset of the upstream "all" dialect plus STRATUM's custom messages.
+set(QGC_MAVLINK_DIALECT "stratum" CACHE STRING "MAVLink dialect")
 set(QGC_MAVLINK_VERSION "2.0" CACHE STRING "MAVLink protocol version")
 
 # ============================================================================

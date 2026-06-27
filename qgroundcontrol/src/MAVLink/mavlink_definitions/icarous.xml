@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!--
+  STRATUM-patched copy of the upstream ICAROUS dialect.
+
+  Why this file exists: STRATUM's custom ENGAGEMENT_STATUS message uses MAVLink id
+  42001 (authoritative, fixed by the PX4 firmware wire contract). Upstream
+  icarous.xml ALSO defines id 42001 (ICAROUS_KINEMATIC_BANDS), and icarous.xml is
+  pulled into STRATUM's "all" dialect via ardupilotmega.xml. Two messages cannot
+  share an id in one dialect, so mavgen fails (verified: "Duplicate message id
+  42001"). ICAROUS is a NASA detect-and-avoid dialect that STRATUM never uses (no
+  source references), so we drop the single colliding message here to free 42001.
+
+  The build's PATCH_COMMAND (src/MAVLink/CMakeLists.txt) copies this file over the
+  fetched upstream icarous.xml before mavgen runs, alongside stratum.xml.
+
+  This is the ONLY change vs. upstream: ICAROUS_KINEMATIC_BANDS (42001) removed.
+  Enums and ICAROUS_HEARTBEAT (42000) are kept verbatim. Re-check on each mavlink
+  pin bump (QGC_MAVLINK_GIT_TAG).
+-->
+<mavlink>
+  <enums>
+    <enum name="ICAROUS_TRACK_BAND_TYPES">
+      <entry name="ICAROUS_TRACK_BAND_TYPE_NONE" value="0"/>
+      <entry name="ICAROUS_TRACK_BAND_TYPE_NEAR" value="1"/>
+      <entry name="ICAROUS_TRACK_BAND_TYPE_RECOVERY" value="2"/>
+    </enum>
+    <enum name="ICAROUS_FMS_STATE">
+      <entry name="ICAROUS_FMS_STATE_IDLE" value="0"/>
+      <entry name="ICAROUS_FMS_STATE_TAKEOFF" value="1"/>
+      <entry name="ICAROUS_FMS_STATE_CLIMB" value="2"/>
+      <entry name="ICAROUS_FMS_STATE_CRUISE" value="3"/>
+      <entry name="ICAROUS_FMS_STATE_APPROACH" value="4"/>
+      <entry name="ICAROUS_FMS_STATE_LAND" value="5"/>
+    </enum>
+  </enums>
+  <messages>
+    <message id="42000" name="ICAROUS_HEARTBEAT">
+      <description>ICAROUS heartbeat</description>
+      <field type="uint8_t" name="status" enum="ICAROUS_FMS_STATE">See the FMS_STATE enum.</field>
+    </message>
+    <!-- ICAROUS_KINEMATIC_BANDS (id 42001) removed by STRATUM: id reused by ENGAGEMENT_STATUS. -->
+  </messages>
+</mavlink>

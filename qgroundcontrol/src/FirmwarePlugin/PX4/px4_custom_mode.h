@@ -37,7 +37,9 @@ enum PX4_CUSTOM_SUB_MODE_AUTO {
 	PX4_CUSTOM_SUB_MODE_AUTO_GUIDED_COURSE,    // 19
 	PX4_CUSTOM_SUB_MODE_AUTO_STANDOFF,         // 20
 	// STRATUM: append-only, kept in lock-step with firmware ordering so ENGAGEMENT resolves to 21.
-	PX4_CUSTOM_SUB_MODE_AUTO_ENGAGEMENT        // 21
+	PX4_CUSTOM_SUB_MODE_AUTO_ENGAGEMENT,       // 21
+	// STRATUM: append-only, kept in lock-step with firmware ordering so ABORT resolves to 22.
+	PX4_CUSTOM_SUB_MODE_AUTO_ABORT             // 22
 };
 
 enum PX4_CUSTOM_SUB_MODE_POSCTL {
@@ -81,5 +83,6 @@ struct PX4CustomMode{
         AUTO_TAKEOFF        = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF       << 24 ),
         AUTO_STANDOFF       = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_STANDOFF      << 24 ),
         AUTO_ENGAGEMENT     = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_ENGAGEMENT    << 24 ),
+        AUTO_ABORT          = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_ABORT         << 24 ),
     };
 };

@@ -31,6 +31,13 @@ Item {
         Component.onCompleted:  start()
     }
 
+    // STRATUM: shared engagement/abort safety-loop controller. Reached by the Engage
+    // trigger (down the tool-strip chain) and the Abort control + countdown overlay
+    // below, so both act on one piece of arming/destination state.
+    EngagementController {
+        id: engagementController
+    }
+
     property bool   _mainWindowIsMap:       mapControl.pipState.state === mapControl.pipState.fullState
     property bool   _isFullWindowItemDark:  _mainWindowIsMap ? mapControl.isSatelliteMap : true
     property var    _activeVehicle:         QGroundControl.multiVehicleManager.activeVehicle
@@ -116,6 +123,7 @@ Item {
             z:                      _fullItemZorder + 2
             parentToolInsets:       _toolInsets
             mapControl:             _mapControl
+            engagementController:   engagementController
             visible:                !QGroundControl.videoManager.fullScreen
         }
 
@@ -233,39 +241,14 @@ Item {
             }
         }
 
-        // STRATUM: blinking ENGAGING! overlay. Shown whenever the vehicle is in the
-        // PX4 custom "Engagement" flight mode, triggered from the left-strip Engage
-        // button. Anchored to the top-centre of the flight view (below the toolbar),
-        // sits above all map widgets so it cannot be missed.
-        Rectangle {
-            id:                         engagingOverlay
-            anchors.horizontalCenter:   parent.horizontalCenter
-            anchors.top:                parent.top
-            anchors.topMargin:          toolbar.height + (_toolsMargin * 3)
-            width:                       engagingLabel.contentWidth + (_toolsMargin * 6)
-            height:                      engagingLabel.contentHeight + (_toolsMargin * 3)
-            radius:                      ScreenTools.defaultBorderRadius
-            color:                       "#cc0000"
-            border.color:                "white"
-            border.width:                2
-            z:                           QGroundControl.zOrderTopMost
-            visible:                     _activeVehicle && _activeVehicle.flightMode === qsTr("Engagement")
-
-            QGCLabel {
-                id:                 engagingLabel
-                anchors.centerIn:   parent
-                text:               qsTr("ENGAGING!")
-                color:              "white"
-                font.bold:          true
-                font.pointSize:     ScreenTools.largeFontPointSize
-            }
-
-            SequentialAnimation on opacity {
-                running:    engagingOverlay.visible
-                loops:      Animation.Infinite
-                NumberAnimation { from: 1.0; to: 0.25; duration: 450 }
-                NumberAnimation { from: 0.25; to: 1.0; duration: 450 }
-            }
+        // STRATUM: engagement status + abort overlay. Top-centre of the flight view
+        // (below the toolbar), above all map widgets so it cannot be missed. Carries
+        // the blinking ENGAGING! banner, the time-to-impact countdown, and the
+        // HOLD-TO-ABORT control. Driven by the shared engagement/abort controller.
+        EngagementAbortOverlay {
+            id:                     engagementAbortOverlay
+            engagementController:    engagementController
+            topMargin:               toolbar.height + (_toolsMargin * 3)
         }
 
         Loader {

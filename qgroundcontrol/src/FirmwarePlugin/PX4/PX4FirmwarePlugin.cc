@@ -44,6 +44,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
     const QString orbitFlightModeName = tr("Orbit");
     const QString standoffFlightModeName = tr("Standoff");
     const QString engagementFlightModeName = tr("Engagement");
+    const QString abortFlightModeName = tr("Abort");
 
     _setModeEnumToModeStringMapping({
         { PX4CustomMode::MANUAL,        manualFlightModeName      },
@@ -65,6 +66,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
         { PX4CustomMode::AUTO_TAKEOFF,  takeoffFlightModeName     },
         { PX4CustomMode::AUTO_STANDOFF, standoffFlightModeName    },
         { PX4CustomMode::AUTO_ENGAGEMENT, engagementFlightModeName },
+        { PX4CustomMode::AUTO_ABORT,    abortFlightModeName       },
     });
 
     static FlightModeList availableFlightModes = {
@@ -88,6 +90,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
         { takeoffFlightModeName,    PX4CustomMode::AUTO_TAKEOFF,    false,  false},
         { standoffFlightModeName,   PX4CustomMode::AUTO_STANDOFF,   true,   true },
         { engagementFlightModeName, PX4CustomMode::AUTO_ENGAGEMENT, true,   true },
+        { abortFlightModeName,      PX4CustomMode::AUTO_ABORT,      true,   true },
     };
 
     updateAvailableFlightModes(availableFlightModes);
@@ -175,6 +178,16 @@ bool PX4FirmwarePlugin::isCapable(const Vehicle *vehicle, FirmwareCapabilities c
 void PX4FirmwarePlugin::initializeVehicle(Vehicle* vehicle)
 {
     vehicle->setFirmwarePluginInstanceData(new PX4FirmwarePluginInstanceData);
+
+    // STRATUM: ensure the custom ENGAGEMENT_STATUS (42001) telemetry streams at ~5 Hz
+    // so the abort countdown has live data. PX4 streams it by default in NORMAL mode;
+    // this request is belt-and-suspenders and is harmless on firmware that does not
+    // know the message (showError=false). param1 = message id, param2 = interval [us].
+    vehicle->sendMavCommand(vehicle->defaultComponentId(),
+                            MAV_CMD_SET_MESSAGE_INTERVAL,
+                            false,                                  // showError
+                            MAVLINK_MSG_ID_ENGAGEMENT_STATUS,       // param1: message id
+                            200000);                                // param2: 200 ms => 5 Hz
 }
 
 bool PX4FirmwarePlugin::sendHomePositionToVehicle(void) const
@@ -784,6 +797,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
     const struct { PX4CustomMode::Mode mode; const char *name; } stratumModes[] = {
         { PX4CustomMode::AUTO_STANDOFF,   "Standoff"   },
         { PX4CustomMode::AUTO_ENGAGEMENT, "Engagement" },
+        { PX4CustomMode::AUTO_ABORT,      "Abort"      },
     };
     for (const auto &sm : stratumModes) {
         bool present = false;
@@ -821,6 +835,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_TAKEOFF      :
         case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
         case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
+        case PX4CustomMode::AUTO_ABORT        :   // STRATUM
             mode.multiRotor = true;
             break;
         case PX4CustomMode::POSCTL_ORBIT      :
@@ -852,6 +867,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_TAKEOFF      :
         case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
         case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
+        case PX4CustomMode::AUTO_ABORT        :   // STRATUM
             mode.fixedWing = true;
             break;
         }

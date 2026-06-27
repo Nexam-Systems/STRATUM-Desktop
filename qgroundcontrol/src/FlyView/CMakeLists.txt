@@ -13,6 +13,9 @@ qt_add_qml_module(FlyViewModule
         CustomGuidedActionsController.qml
         DefaultChecklist.qml
         EngageAction.qml
+        EngagementAbortOverlay.qml
+        EngagementController.qml
+        EngagementCountdown.qml
         FixedWingChecklist.qml
         FlightDisplayViewDummy.qml
         FlightDisplayViewVideoOutput.qml

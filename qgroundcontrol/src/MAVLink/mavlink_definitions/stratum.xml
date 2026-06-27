@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  STRATUM-owned MAVLink dialect.
+
+  Purpose: add STRATUM's custom messages to the ground station's MAVLink library
+  WITHOUT forking or pinning upstream mavlink. It includes the full upstream
+  aggregate dialect (all.xml, fetched unchanged via CPM at the pinned commit) and
+  appends only what STRATUM owns.
+
+  Build wiring: copied next to all.xml in the fetched mavlink source tree
+  (message_definitions/v1.0) by the PATCH_COMMAND in src/MAVLink/CMakeLists.txt;
+  QGC_MAVLINK_DIALECT is set to "stratum" in cmake/CustomOptions.cmake so mavgen
+  generates this dialect.
+
+  CRC parity: ENGAGEMENT_STATUS below is byte-for-byte the contract definition
+  (B1). CRC_EXTRA is a pure function of the message name plus each field's type and
+  name in wire-sorted order, independent of file, surrounding dialect, or message
+  id. Keeping the field block identical to the PX4 firmware definition guarantees
+  the vehicle and the ground station agree, so frames are accepted rather than
+  silently dropped. Do NOT reorder fields or rename anything.
+-->
+<mavlink>
+  <include>all.xml</include>
+  <messages>
+    <message id="42001" name="ENGAGEMENT_STATUS">
+      <description>Engagement guidance status. Carries the estimated time-to-impact used by the ground station to display an abort countdown during a terminal engagement run.</description>
+      <field type="uint8_t" name="state">Engagement state: 0=INACTIVE, 1=DIVE, 2=RECOVER.</field>
+      <field type="float" name="time_to_impact" units="s" invalid="NaN">Estimated time until impact. NaN if not estimable.</field>
+      <field type="float" name="range" units="m" invalid="NaN">Slant range from the vehicle to the target. NaN if unknown.</field>
+      <field type="float" name="closing_speed" units="m/s" invalid="NaN">Closing speed along the line of sight, positive when closing. NaN if unknown.</field>
+      <field type="uint8_t" name="valid">1 if time_to_impact is a usable estimate, 0 otherwise.</field>
+    </message>
+  </messages>
+</mavlink>
