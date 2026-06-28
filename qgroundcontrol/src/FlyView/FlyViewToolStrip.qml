@@ -22,11 +22,16 @@ ToolStrip {
 
     // STRATUM: state-accent mapping. SINGLE SOURCE OF TRUTH - kept in lock-step with
     // the identical mapping in FlightMap/MapItems/VehicleMapItem.qml (vehicle icon
-    // tint). Engagement -> red, flying -> green, on the ground -> blue, no vehicle ->
-    // olive branding. White content on the saturated state colours, dark on olive.
+    // tint) and Toolbar/FlyViewToolBar.qml (ribbon). Abort -> amber, Engagement ->
+    // red, flying / takeoff / hold / standoff -> green, on the ground -> blue, no
+    // vehicle -> olive branding. White content on the saturated state colours, dark on olive.
     accentColor:     !_activeVehicle ? qgcPal.brandingPurple :
+                         _activeVehicle.flightMode === qsTr("Abort") ? "#FF8F00" :
                          _activeVehicle.flightMode === qsTr("Engagement") ? "#D32F2F" :
-                             _activeVehicle.flying ? "#43A047" : "#1E88E5"
+                             (_activeVehicle.flightMode === qsTr("Standoff") ||
+                              _activeVehicle.flightMode === qsTr("Takeoff") ||
+                              _activeVehicle.flightMode === _activeVehicle.pauseFlightMode ||
+                              _activeVehicle.flying) ? "#43A047" : "#1E88E5"
     accentTextColor: _activeVehicle ? "#FFFFFF" : "#1A1A1A"
 
     signal displayPreFlightChecklist

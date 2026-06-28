@@ -16,15 +16,45 @@ Item {
 
     property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
     property bool   _communicationLost: _activeVehicle ? _activeVehicle.vehicleLinkManager.communicationLost : false
-    property color  _mainStatusBGColor: qgcPal.brandingPurple
     property real   _leftRightMargin:   ScreenTools.defaultFontPixelWidth * 0.75
     property var    _guidedController:  globals.guidedControllerFlyView
+
+    // STRATUM: solid ribbon colour reflects operational state. Kept in lock-step with
+    // FlyViewToolStrip.qml and FlightMap/MapItems/VehicleMapItem.qml.
+    readonly property string _abortModeName:      qsTr("Abort")
+    readonly property string _engagementModeName: qsTr("Engagement")
+    readonly property string _holdModeName:       _activeVehicle ? _activeVehicle.pauseFlightMode : qsTr("Hold")
+    property color _ribbonColor: {
+        if (!_activeVehicle) {
+            return qgcPal.brandingPurple
+        }
+        if (_communicationLost) {
+            return "#D32F2F"
+        }
+        var mode = _activeVehicle.flightMode
+        if (mode === _abortModeName) {
+            return "#FF8F00"
+        }
+        if (mode === _engagementModeName) {
+            return "#D32F2F"
+        }
+        if (mode === qsTr("Standoff") || mode === qsTr("Takeoff") || mode === _holdModeName || _activeVehicle.flying) {
+            return "#43A047"
+        }
+        return "#1E88E5"
+    }
+    readonly property color _ribbonTextColor: "#FFFFFF"
 
     function dropMainStatusIndicatorTool() {
         mainStatusIndicator.dropMainStatusIndicator();
     }
 
     QGCPalette { id: qgcPal }
+
+    Rectangle {
+        anchors.fill:   parent
+        color:          _ribbonColor
+    }
 
     QGCFlickable {
         anchors.fill:       parent
@@ -40,29 +70,6 @@ Item {
                 id:     leftPanel
                 width:  leftPanelLayout.implicitWidth
                 height: parent.height
-
-                // Gradient background behind Q button and main status indicator
-                Rectangle {
-                    id:         gradientBackground
-                    height:     parent.height
-                    width:      mainStatusLayout.width
-                    opacity:    qgcPal.windowTransparent.a
-
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0; color: _mainStatusBGColor }
-                        //GradientStop { position: qgcButton.x + qgcButton.width; color: _mainStatusBGColor }
-                        GradientStop { position: 1; color: qgcPal.window }
-                    }
-                }
-
-                // Standard toolbar background to the right of the gradient
-                Rectangle {
-                    anchors.left:   gradientBackground.right
-                    anchors.right:  parent.right
-                    height:         parent.height
-                    color:          qgcPal.windowTransparent
-                }
 
                 RowLayout {
                     id:         leftPanelLayout
@@ -88,6 +95,7 @@ Item {
                             id:                 mainStatusIndicator
                             objectName:         "toolbar_mainStatusIndicator"
                             Layout.fillHeight:  true
+                            ribbonTextColor:    _ribbonTextColor
                         }
                     }
 
@@ -111,11 +119,6 @@ Item {
                 // (see FlyView.qml). The center panel now simply spans the remaining width.
                 width:  Math.max(0, control.width - (leftPanel.width + rightPanel.width))
                 height: parent.height
-
-                Rectangle {
-                    anchors.fill:   parent
-                    color:          qgcPal.windowTransparent
-                }
             }
 
             Item {
@@ -123,14 +126,10 @@ Item {
                 width:  flyViewIndicators.width
                 height: parent.height
 
-                Rectangle {
-                    anchors.fill:   parent
-                    color:          qgcPal.windowTransparent
-                }
-
                 FlyViewToolBarIndicators {
-                    id:     flyViewIndicators
-                    height: parent.height
+                    id:                 flyViewIndicators
+                    height:             parent.height
+                    ribbonTextColor:    _ribbonTextColor
                 }
             }
         }

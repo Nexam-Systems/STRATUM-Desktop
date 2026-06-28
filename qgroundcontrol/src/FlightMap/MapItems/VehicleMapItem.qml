@@ -29,11 +29,16 @@ MapQuickItem {
 
     // STRATUM: state-accent tint for the vehicle icon. SINGLE SOURCE OF TRUTH - kept
     // in lock-step with the identical mapping in FlyView/FlyViewToolStrip.qml (command
-    // strip accent). Engagement -> red, flying -> green, on the ground -> blue. ADSB
+    // strip accent) and Toolbar/FlyViewToolBar.qml (ribbon). Abort -> amber, Engagement
+    // -> red, flying / takeoff / hold / standoff -> green, on the ground -> blue. ADSB
     // traffic is never tinted.
     property color  _stateTintColor:    (_adsbVehicle || !vehicle) ? "transparent" :
+                                            vehicle.flightMode === qsTr("Abort") ? "#FF8F00" :
                                             vehicle.flightMode === qsTr("Engagement") ? "#D32F2F" :
-                                                vehicle.flying ? "#43A047" : "#1E88E5"
+                                            (vehicle.flightMode === qsTr("Standoff") ||
+                                             vehicle.flightMode === qsTr("Takeoff") ||
+                                             vehicle.flightMode === vehicle.pauseFlightMode ||
+                                             vehicle.flying) ? "#43A047" : "#1E88E5"
     property bool   _stateTintActive:   !_adsbVehicle && !!vehicle
 
     sourceItem: Item {
