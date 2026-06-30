@@ -43,6 +43,7 @@ qt_add_qml_module(FlyViewModule
         FlyViewTopRightColumnLayout.qml
         FlyViewTopRightPanel.qml
         FlyViewVideo.qml
+        FlyViewVideoOSD.qml
         FlyViewWidgetLayer.qml
         GuidedActionAbort.qml
         GuidedActionChangeAltitude.qml
@@ -100,5 +101,4 @@ qt_add_resources(FlyViewModule flyview_qmlimages
     PREFIX "/qmlimages"
     BASE "${CMAKE_SOURCE_DIR}/resources"
     FILES
-        "${CMAKE_SOURCE_DIR}/resources/check.svg"
-)
+        "${CMAKE_SOURCE_D

@@ -133,4 +133,5 @@ Item {
         id: obstacleDistance
         showText: pipState.state === pipState.fullState
     }
-}
+
+ 
