@@ -37,6 +37,7 @@ qt_add_qml_module(FlyViewModule
         FlyViewMap.qml
         FlyViewMissionCompleteDialog.qml
         FlyViewPreFlightChecklistPopup.qml
+        FlyViewStandoffAction.qml
         FlyViewToolStrip.qml
         FlyViewToolStripActionList.qml
 
@@ -76,7 +77,6 @@ qt_add_qml_module(FlyViewModule
         ProximityRadarVideoView.qml
         RoverChecklist.qml
         StandoffController.qml
-        StandoffDialog.qml
         StandoffOrbitDialog.qml
         SubChecklist.qml
         TelemetryValuesBar.qml

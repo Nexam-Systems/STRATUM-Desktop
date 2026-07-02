@@ -229,8 +229,16 @@ Item {
             preFlightChecklistLoader.item.open()
         }
 
-        // STRATUM: enter Area-Of-Operations edit mode on the single Fly map.
-        onDefineAOP: mapControl.startAOPEdit()
+        // STRATUM: enter Area-Of-Operations edit mode on the single Fly map. The
+        // standoff panel is closed first so its crosshair pick mode and the AOP
+        // polygon editor never contend for the same map clicks.
+        onDefineAOP: {
+            standoffPanel.close()
+            mapControl.startAOPEdit()
+        }
+
+        // STRATUM: toggle the standoff entry panel beside the strip.
+        onSetStandoff: standoffPanel.toggle()
 
         property real topEdgeLeftInset:     visible ? y + height : 0
         property real leftEdgeTopInset:     visible ? x + width : 0
@@ -240,6 +248,174 @@ Item {
     VehicleWarnings {
         anchors.centerIn:   parent
         z:                  QGroundControl.zOrderTopMost
+    }
+
+    // STRATUM: Standoff entry panel. Opened by the crimson "Set Standoff" strip
+    // command; sits beside the strip (top-aligned with the button) rather than over
+    // the map centre. The operator either types the target lat/lon or clicks the map
+    // while the crosshair pick cursor is active (FlyViewMap._standoffPickMode) - both
+    // paths fill the same fields, and the last writer wins. Commit goes through
+    // StandoffController.beginStandoff with the coordinate, so the geometry contract
+    // with PX4 (target + distance / bearing / relative height) is unchanged.
+    Rectangle {
+        id:                 standoffPanel
+        visible:            false
+        z:                  QGroundControl.zOrderTopMost
+        anchors.left:       toolStrip.right
+        anchors.leftMargin: _toolsMargin
+        anchors.top:        toolStrip.top
+        radius:             _margins
+        color:              qgcPal.window
+        border.color:       "#D11A35"
+        border.width:       1
+        width:              standoffPanelGrid.width + _toolsMargin * 4
+        height:             standoffPanelGrid.height + _toolsMargin * 4
+
+        property bool _coordValid: {
+            var lat = parseFloat(standoffLatField.text)
+            var lon = parseFloat(standoffLonField.text)
+            return !isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+        }
+
+        function open() {
+            visible = true
+            if (mapControl) {
+                mapControl.startStandoffPick()
+            }
+        }
+        function close() {
+            visible = false
+            if (mapControl) {
+                mapControl.stopStandoffPick()
+            }
+        }
+        function toggle() {
+            if (visible) {
+                close()
+            } else {
+                open()
+            }
+        }
+
+        // Crosshair map pick -> fields.
+        Connections {
+            target: mapControl
+            function onStandoffTargetPicked(coordinate) {
+                standoffLatField.text = coordinate.latitude.toFixed(7)
+                standoffLonField.text = coordinate.longitude.toFixed(7)
+            }
+        }
+
+        DeadMouseArea { anchors.fill: parent }
+
+        GridLayout {
+            id:                 standoffPanelGrid
+            anchors.centerIn:   parent
+            columns:            2
+            columnSpacing:      ScreenTools.defaultFontPixelWidth
+            rowSpacing:         ScreenTools.defaultFontPixelHeight / 2
+
+            QGCLabel {
+                Layout.columnSpan:  2
+                text:               qsTr("Set Standoff")
+                font.bold:          true
+            }
+
+            QGCLabel {
+                Layout.columnSpan:   2
+                Layout.maximumWidth: ScreenTools.defaultFontPixelWidth * 34
+                wrapMode:            Text.WordWrap
+                text:                qsTr("Enter the target position, or click the map with the crosshair cursor.")
+            }
+
+            QGCLabel { text: qsTr("Latitude") }
+            QGCTextField {
+                id:                    standoffLatField
+                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
+                unitsLabel:            qsTr("deg")
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+            }
+
+            QGCLabel { text: qsTr("Longitude") }
+            QGCTextField {
+                id:                    standoffLonField
+                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
+                unitsLabel:            qsTr("deg")
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+            }
+
+            QGCLabel { text: qsTr("Standoff distance") }
+            QGCTextField {
+                id:                    standoffDistanceField
+                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
+                text:                  "50"
+                unitsLabel:            QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+            }
+
+            QGCLabel { text: qsTr("Standoff height") }
+            QGCTextField {
+                id:                    standoffHeightField
+                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
+                text:                  "30"
+                unitsLabel:            QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+            }
+
+            QGCLabel { text: qsTr("Direction") }
+            QGCTextField {
+                id:                    standoffDirectionField
+                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
+                text:                  "0"
+                unitsLabel:            qsTr("deg (from N)")
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+            }
+
+            // STRATUM: the command needs a vehicle; surface that instead of failing
+            // silently inside beginStandoff.
+            QGCLabel {
+                Layout.columnSpan:  2
+                visible:            !_activeVehicle
+                color:              "#F2C200"
+                text:               qsTr("No vehicle connected.")
+            }
+
+            RowLayout {
+                Layout.columnSpan:  2
+                Layout.alignment:   Qt.AlignRight
+                spacing:            _toolsMargin
+
+                QGCButton {
+                    text:       qsTr("Cancel")
+                    onClicked:  standoffPanel.close()
+                }
+
+                QGCButton {
+                    text:       qsTr("Set Standoff")
+                    primary:    true
+                    enabled:    standoffPanel._coordValid && _activeVehicle !== null
+                    onClicked: {
+                        var distance = parseFloat(standoffDistanceField.text)
+                        var height   = parseFloat(standoffHeightField.text)
+                        var angle    = parseFloat(standoffDirectionField.text)
+                        if (isNaN(distance) || distance <= 0) { distance = 0 }
+                        if (isNaN(height))                     { height   = 0 }
+                        if (isNaN(angle))                      { angle    = 0 }
+                        // Normalize bearing into [0, 360)
+                        angle = ((angle % 360) + 360) % 360
+                        var target = QtPositioning.coordinate(parseFloat(standoffLatField.text),
+                                                              parseFloat(standoffLonField.text))
+                        mapControl.standoffCmdController.beginStandoff(distance, height, angle, target)
+                        standoffPanel.close()
+                    }
+                }
+            }
+        }
     }
 
     MapScale {

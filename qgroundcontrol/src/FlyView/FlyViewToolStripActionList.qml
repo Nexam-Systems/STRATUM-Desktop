@@ -11,6 +11,7 @@ ToolStripActionList {
 
     signal displayPreFlightChecklist
     signal defineAOP
+    signal setStandoff    // STRATUM: open the standoff entry panel (FlyViewWidgetLayer)
 
     // STRATUM: focused command strip. Every in-scope flight command lives here as a
     // hold-to-confirm button; the toolbar mode dropdown has been retired (the out-of-scope
@@ -19,6 +20,9 @@ ToolStripActionList {
     // actions, which did not reliably affect the vehicle. Takeoff keeps its altitude
     // dialog and Engage keeps the abort-arming engagement controller.
     model: [
+        // STRATUM: standoff entry point. Crimson command button above Define AOP;
+        // opens the panel beside the strip instead of a map-click menu.
+        FlyViewStandoffAction { onTriggered: setStandoff() },
         FlyViewAOPAction { onTriggered: defineAOP() },
         GuidedActionTakeoff { },
         GuidedActionHold { },

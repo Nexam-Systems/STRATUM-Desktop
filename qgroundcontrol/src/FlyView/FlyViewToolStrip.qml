@@ -36,6 +36,7 @@ ToolStrip {
 
     signal displayPreFlightChecklist
     signal defineAOP
+    signal setStandoff    // STRATUM: forwarded to FlyViewWidgetLayer's standoff panel
 
     FlyViewToolStripActionList {
         id: flyViewToolStripActionList
@@ -43,6 +44,7 @@ ToolStrip {
         engagementController:        _root.engagementController
         onDisplayPreFlightChecklist: _root.displayPreFlightChecklist()
         onDefineAOP:                 _root.defineAOP()
+        onSetStandoff:               _root.setStandoff()
     }
 
     model: flyViewToolStripActionList.model

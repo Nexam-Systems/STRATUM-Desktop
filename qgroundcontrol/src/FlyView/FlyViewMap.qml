@@ -54,6 +54,22 @@ FlightMap {
     // and the Apply/Cancel bar is shown. The AOP is a polygon inclusion fence.
     property bool   _aopEditMode:               false
 
+    // STRATUM: Standoff target pick mode. Driven by the Set Standoff panel in
+    // FlyViewWidgetLayer: while active the map cursor is a crosshair and a left
+    // click reports the clicked coordinate through standoffTargetPicked() instead
+    // of opening the guided-action menu. The panel owns the lifecycle via
+    // startStandoffPick() / stopStandoffPick().
+    property bool   _standoffPickMode:          false
+
+    // STRATUM: standoff command controller, exposed so the widget-layer panel can
+    // commit through beginStandoff().
+    readonly property var standoffCmdController: standoffController
+
+    signal standoffTargetPicked(var coordinate)
+
+    function startStandoffPick() { _standoffPickMode = true }
+    function stopStandoffPick()  { _standoffPickMode = false }
+
     // STRATUM: true when the fence model already holds an inclusion polygon with
     // enough vertices to be a real, visible area. A connected vehicle whose fence is
     // empty (or a zero-vertex placeholder) returns false, so we seed our own AOP
@@ -894,20 +910,10 @@ FlightMap {
                     spacing: ScreenTools.defaultFontPixelWidth / 2
 
                     // STRATUM: the legacy guided map actions (Go to location, Orbit at
-                    // location, ROI at location) are replaced by a single Standoff command.
-                    // The standoff dialog captures distance / height / angle, then the
-                    // StandoffController flies the vehicle to the computed standoff point
-                    // and offers to orbit on arrival.
-                    QGCButton {
-                        Layout.fillWidth:   true
-                        text:               qsTr("Standoff here")
-                        visible:            globals.guidedControllerFlyView.showGotoLocation
-                        onClicked: {
-                            mapClickDropPanel.close()
-                            standoffController.showStandoffDialog(mapClickCoord)
-                        }
-                    }
-
+                    // location, ROI at location) are retired. The Standoff command now
+                    // lives on the left tool strip ("Set Standoff" -> entry panel with
+                    // manual lat/lon or crosshair map pick); this menu keeps only the
+                    // remaining point-anchored utilities.
                     QGCButton {
                         Layout.fillWidth:   true
                         text:               qsTr("Set home here")
@@ -949,6 +955,12 @@ FlightMap {
     }
 
     onMapClicked: (position) => {
+        // STRATUM: standoff pick mode wins the click. Report the coordinate to the
+        // Set Standoff panel and suppress the guided-action menu entirely.
+        if (_root._standoffPickMode) {
+            _root.standoffTargetPicked(_root.toCoordinate(Qt.point(position.x, position.y), false /* clipToViewPort */))
+            return
+        }
         // STRATUM: while defining the AOP, map clicks belong to the polygon
         // editor (vertex add/drag); suppress the guided-action drop panel.
         if (_root._aopEditMode) {
@@ -966,6 +978,17 @@ FlightMap {
             var dropPanel = mapClickDropPanelComponent.createObject(mainWindow, { mapClickCoord: clickCoord, clickRect: Qt.rect(position.x, position.y, 0, 0) })
             dropPanel.open()
         }
+    }
+
+    // STRATUM: crosshair cursor while the Set Standoff panel is picking a target.
+    // acceptedButtons: NoButton keeps the area event-transparent, so clicks still
+    // reach the map's own click handling; the area exists purely for the cursor.
+    MouseArea {
+        anchors.fill:    parent
+        visible:         _root._standoffPickMode
+        acceptedButtons: Qt.NoButton
+        cursorShape:     Qt.CrossCursor
+        z:               QGroundControl.zOrderTopMost
     }
 
     MapScale {

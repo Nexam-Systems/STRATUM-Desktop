@@ -35,15 +35,6 @@ Item {
     signal standoffPointChanged(var targetCoordinate, var standoffCoordinate)
 
     QGCPopupDialogFactory {
-        id:              standoffDialogFactory
-        dialogComponent: standoffDialogComponent
-    }
-    Component {
-        id: standoffDialogComponent
-        StandoffDialog { standoffController: root }
-    }
-
-    QGCPopupDialogFactory {
         id:              orbitPromptFactory
         dialogComponent: orbitPromptComponent
     }
@@ -52,15 +43,10 @@ Item {
         StandoffOrbitDialog { standoffController: root }
     }
 
-    // Open the parameter dialog for a freshly clicked target.
-    function showStandoffDialog(targetCoordinate) {
-        _targetCoordinate = targetCoordinate
-        standoffDialogFactory.open()
-    }
-
     // distanceUnits / heightUnits are in the user's configured units; angleDeg is a
-    // compass bearing (0 = North, clockwise). targetCoordinate is optional: when the
-    // dialog supplies a valid operator-entered lat/lon it overrides the clicked target.
+    // compass bearing (0 = North, clockwise). targetCoordinate carries the target
+    // designated in the Set Standoff panel (manual lat/lon entry or crosshair map
+    // pick); the legacy map-click dialog path has been retired.
     function beginStandoff(distanceUnits, heightUnits, angleDeg, targetCoordinate) {
         if (!_activeVehicle) {
             return

@@ -36,9 +36,16 @@ Button {
     property color accentColor:      qgcPal.brandingPurple
     property color accentTextColor:  "#1A1A1A"
 
+    // STRATUM: optional per-action accent override. A QML ToolStripAction may declare
+    // accentColorOverride / accentTextColorOverride (e.g. the crimson Set Standoff
+    // command); plain C++ ToolStripActions lack the properties, the lookup yields
+    // undefined, and the button falls through to the strip-wide accent.
+    property color _accentFill:      (toolStripAction && toolStripAction.accentColorOverride)     ? toolStripAction.accentColorOverride     : accentColor
+    property color _accentContent:   (toolStripAction && toolStripAction.accentTextColorOverride) ? toolStripAction.accentTextColorOverride : accentTextColor
+
     // STRATUM: on accent buttons the content colour is paired with the fill by the
     // caller (dark on the light olive default, white on the saturated state colours).
-    property color _currentContentColor:  accentButtons ? accentTextColor :
+    property color _currentContentColor:  accentButtons ? _accentContent :
                                               ((checked || pressed) ? qgcPal.buttonHighlightText : qgcPal.text)
     property color _currentContentColorSecondary:  (checked || pressed) ? qgcPal.text : qgcPal.buttonHighlight
 
@@ -145,7 +152,7 @@ Button {
         color:  (control.checked || control.pressed) ?
                     qgcPal.buttonHighlight :
                     ((control.enabled && control.hovered) ? qgcPal.toolStripHoverColor :
-                        (control.accentButtons ? control.accentColor : "transparent"))
+                        (control.accentButtons ? control._accentFill : "transparent"))
         // STRATUM: dim the accent fill when the action is unavailable so disabled
         // commands remain visibly inert rather than reading as armed.
         opacity: (control.accentButtons && !control.enabled) ? 0.35 : 1.0
