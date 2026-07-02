@@ -65,10 +65,22 @@ FlightMap {
     // commit through beginStandoff().
     readonly property var standoffCmdController: standoffController
 
+    // STRATUM: interim target while the Set Standoff panel is open. Fed by the panel
+    // (map pick or valid manual lat/lon entry - the panel is the single writer) and
+    // rendered as the BLUE pending marker. Cleared when pick mode ends; on commit the
+    // controller's _targetCoordinate takes over and the marker turns red (engaged).
+    property var    _standoffPendingCoordinate: QtPositioning.coordinate()
+
     signal standoffTargetPicked(var coordinate)
 
     function startStandoffPick() { _standoffPickMode = true }
-    function stopStandoffPick()  { _standoffPickMode = false }
+    function stopStandoffPick() {
+        _standoffPickMode = false
+        _standoffPendingCoordinate = QtPositioning.coordinate()
+    }
+    function setStandoffPendingCoordinate(coordinate) {
+        _standoffPendingCoordinate = coordinate
+    }
 
     // STRATUM: true when the fence model already holds an inclusion polygon with
     // enough vertices to be a real, visible area. A connected vehicle whose fence is
@@ -800,50 +812,64 @@ FlightMap {
         z:              QGroundControl.zOrderMapItems
     }
 
-    // STRATUM: target marker. A minimal crimson reticle dropped on the operator's
-    // designated target (the centre of the surveillance circle), NOT the vehicle's
-    // standoff hold-point. "Standoff here" on the map menu is a deliberate misnomer:
-    // the operator clicks the target, and the standoff distance is how far the vehicle
-    // holds off from it. The reticle's CENTRE anchors exactly on the coordinate. The
-    // icon scales with map zoom inside fixed bounds, so it grows as the operator zooms
-    // in and shrinks zooming out without ever becoming a speck or swamping the view.
-    // Shown whenever a standoff hold / orbit is active.
-    MapQuickItem {
-        id:             standoffPointMarker
-        coordinate:     standoffController._targetCoordinate
-        visible:        standoffController._standoffActive && standoffController._targetCoordinate.isValid
-        anchorPoint.x:  standoffPin.width  / 2
-        anchorPoint.y:  standoffPin.height / 2   // square SVG: geometric centre anchors on target
+    // STRATUM: target markers. A simple "T" in a circle whose CENTRE anchors exactly
+    // on the coordinate; the monochrome SVG is tinted per state through QGCColoredImage.
+    // BLUE = target being set (panel open, valid coordinate, OK not yet pressed).
+    // RED  = standoff engaged; the target position is currently being served.
+    // The icon scales with map zoom inside fixed bounds (~1.25x per level, clamped
+    // [0.7, 1.9], zoomLevel 16 -> 1.0x) so it neither vanishes nor swamps the view.
+    component StandoffTargetMarker : MapQuickItem {
+        id:             targetMarkerRoot
+        anchorPoint.x:  sourceItem.width  / 2
+        anchorPoint.y:  sourceItem.height / 2   // square icon: geometric centre on target
         z:              QGroundControl.zOrderMapItems + 1
 
-        // Bounded zoom scaling: ~1.25x per zoom level, clamped to [0.7, 1.9].
-        // zoomLevel 16 maps to 1.0x.
+        property color markerColor: "#D11A35"
+        property string markerLabel: qsTr("Target")
+
         property real _zoomScale: Math.max(0.7, Math.min(1.9, Math.pow(1.25, _root.zoomLevel - 16)))
         property real _iconSize:  ScreenTools.defaultFontPixelHeight * 2.0 * _zoomScale
 
         sourceItem: Item {
-            width:  standoffPin.width
-            height: standoffPin.height
+            width:  targetMarkerIcon.width
+            height: targetMarkerIcon.height
 
-            Image {
-                id:                 standoffPin
+            QGCColoredImage {
+                id:                 targetMarkerIcon
                 source:             "/qmlimages/StandoffMarker.svg"
-                width:              standoffPointMarker._iconSize
-                height:             standoffPointMarker._iconSize   // square icon (48x48 viewBox)
-                sourceSize.width:   standoffPointMarker._iconSize * 2   // crisp on hi-DPI displays
+                color:              targetMarkerRoot.markerColor
+                width:              targetMarkerRoot._iconSize
+                height:             targetMarkerRoot._iconSize
+                sourceSize.width:   targetMarkerRoot._iconSize * 2   // crisp on hi-DPI displays
                 fillMode:           Image.PreserveAspectFit
                 mipmap:             true
             }
 
             QGCMapLabel {
-                anchors.top:                standoffPin.bottom
+                anchors.top:                targetMarkerIcon.bottom
                 anchors.topMargin:          ScreenTools.defaultFontPixelHeight * 0.15
-                anchors.horizontalCenter:   standoffPin.horizontalCenter
+                anchors.horizontalCenter:   targetMarkerIcon.horizontalCenter
                 map:                        _root
-                text:                       qsTr("Target")
+                text:                       targetMarkerRoot.markerLabel
                 font.pointSize:             ScreenTools.smallFontPointSize
             }
         }
+    }
+
+    // Interim marker: follows the panel's pending coordinate while setting.
+    StandoffTargetMarker {
+        coordinate:     _root._standoffPendingCoordinate
+        visible:        _root._standoffPickMode && _root._standoffPendingCoordinate.isValid
+        markerColor:    "#1E88E5"
+        markerLabel:    qsTr("Target")
+    }
+
+    // Engaged marker: the committed target the standoff is serving.
+    StandoffTargetMarker {
+        coordinate:     standoffController._targetCoordinate
+        visible:        standoffController._standoffActive && standoffController._targetCoordinate.isValid
+        markerColor:    "#D11A35"
+        markerLabel:    qsTr("Target")
     }
 
     QGCPopupDialogFactory {

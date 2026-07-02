@@ -281,6 +281,7 @@ Item {
             visible = true
             if (mapControl) {
                 mapControl.startStandoffPick()
+                _updatePending()   // fields may still hold a valid target from last use
             }
         }
         function close() {
@@ -294,6 +295,21 @@ Item {
                 close()
             } else {
                 open()
+            }
+        }
+
+        // STRATUM: single writer of the map's interim (blue) target marker. Runs on
+        // every lat/lon edit - map picks land here too, since a pick writes the same
+        // fields. An invalid pair clears the marker rather than leaving it stale.
+        function _updatePending() {
+            if (!mapControl) {
+                return
+            }
+            if (_coordValid) {
+                mapControl.setStandoffPendingCoordinate(QtPositioning.coordinate(parseFloat(standoffLatField.text),
+                                                                                 parseFloat(standoffLonField.text)))
+            } else {
+                mapControl.setStandoffPendingCoordinate(QtPositioning.coordinate())
             }
         }
 
@@ -335,6 +351,7 @@ Item {
                 unitsLabel:            qsTr("deg")
                 showUnits:             true
                 inputMethodHints:      Qt.ImhFormattedNumbersOnly
+                onTextChanged:         standoffPanel._updatePending()
             }
 
             QGCLabel { text: qsTr("Longitude") }
@@ -344,6 +361,7 @@ Item {
                 unitsLabel:            qsTr("deg")
                 showUnits:             true
                 inputMethodHints:      Qt.ImhFormattedNumbersOnly
+                onTextChanged:         standoffPanel._updatePending()
             }
 
             QGCLabel { text: qsTr("Standoff distance") }

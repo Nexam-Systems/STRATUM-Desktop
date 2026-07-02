@@ -1,39 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- STRATUM: target marker. A minimal crimson reticle whose centre anchors exactly on
-     the target coordinate (the centre of the surveillance circle). Despite the file
-     name, this marks the TARGET the operator designated, not the vehicle's standoff
-     hold-point. Square viewBox so the geometric centre (24,24) is the anchor. -->
+<!-- STRATUM: target marker - a simple "T" in a circle, centre-anchored on the target
+     coordinate (the centre of the surveillance circle). Drawn MONOCHROME white and
+     tinted at runtime through QGCColoredImage: blue (#1E88E5) while the target is
+     being set in the Set Standoff panel, red (#D11A35) once the standoff is engaged
+     and the target position is being served. The same asset, tinted by button state,
+     serves as the tool-strip icon. Square viewBox so the geometric centre (24,24)
+     is the anchor. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <defs>
-    <filter id="ds" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="0.6" stdDeviation="1.1" flood-color="#000000" flood-opacity="0.55"/>
-    </filter>
-  </defs>
-
-  <g filter="url(#ds)">
-    <!-- Dark halo ring for legibility over bright or busy imagery. -->
-    <circle cx="24" cy="24" r="13" fill="none" stroke="#1C1C1F" stroke-width="5"/>
-    <!-- Crimson reticle ring. -->
-    <circle cx="24" cy="24" r="13" fill="none" stroke="#D11A35" stroke-width="2.6"/>
-
-    <!-- Four crosshair ticks crossing the ring (dark backing + crimson). -->
-    <g stroke-linecap="round">
-      <g stroke="#1C1C1F" stroke-width="5">
-        <line x1="24" y1="4"  x2="24" y2="15"/>
-        <line x1="24" y1="33" x2="24" y2="44"/>
-        <line x1="4"  y1="24" x2="15" y2="24"/>
-        <line x1="33" y1="24" x2="44" y2="24"/>
-      </g>
-      <g stroke="#D11A35" stroke-width="2.6">
-        <line x1="24" y1="4"  x2="24" y2="15"/>
-        <line x1="24" y1="33" x2="24" y2="44"/>
-        <line x1="4"  y1="24" x2="15" y2="24"/>
-        <line x1="33" y1="24" x2="44" y2="24"/>
-      </g>
-    </g>
-
-    <!-- Centre dot pinned on the target coordinate. -->
-    <circle cx="24" cy="24" r="3" fill="#FFFFFF"/>
-    <circle cx="24" cy="24" r="1.7" fill="#D11A35"/>
-  </g>
+  <circle cx="24" cy="24" r="19" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+  <rect x="14" y="13" width="20" height="5" rx="1" fill="#FFFFFF"/>
+  <rect x="21.5" y="13" width="5" height="22" rx="1" fill="#FFFFFF"/>
 </svg>
