@@ -59,10 +59,14 @@ Item {
     }
 
     // distanceUnits / heightUnits are in the user's configured units; angleDeg is a
-    // compass bearing (0 = North, clockwise).
-    function beginStandoff(distanceUnits, heightUnits, angleDeg) {
+    // compass bearing (0 = North, clockwise). targetCoordinate is optional: when the
+    // dialog supplies a valid operator-entered lat/lon it overrides the clicked target.
+    function beginStandoff(distanceUnits, heightUnits, angleDeg, targetCoordinate) {
         if (!_activeVehicle) {
             return
+        }
+        if (targetCoordinate !== undefined && targetCoordinate.isValid) {
+            _targetCoordinate = targetCoordinate
         }
         _standoffDistance = _unitsConversion.appSettingsHorizontalDistanceUnitsToMeters(distanceUnits)
         _standoffHeight   = _unitsConversion.appSettingsVerticalDistanceUnitsToMeters(heightUnits)
