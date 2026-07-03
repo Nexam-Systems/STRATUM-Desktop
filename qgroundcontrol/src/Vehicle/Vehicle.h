@@ -52,6 +52,7 @@ class VehicleTemperatureFactGroup;
 class VehicleVibrationFactGroup;
 class VehicleWindFactGroup;
 class VehicleEngagementStatusFactGroup;   // STRATUM
+class VehicleVisionEngagementStatusFactGroup;   // STRATUM
 class Autotune;
 class ComponentInformationManager;
 class MAVLinkEventManager;
@@ -240,6 +241,7 @@ public:
     Q_PROPERTY(FactGroup*           wind            READ windFactGroup              CONSTANT)
     Q_PROPERTY(FactGroup*           vibration       READ vibrationFactGroup         CONSTANT)
     Q_PROPERTY(FactGroup*           engagementStatus READ engagementStatusFactGroup CONSTANT)   // STRATUM
+    Q_PROPERTY(FactGroup*           visionEngagementStatus READ visionEngagementStatusFactGroup CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           temperature     READ temperatureFactGroup       CONSTANT)
     Q_PROPERTY(FactGroup*           clock           READ clockFactGroup             CONSTANT)
     Q_PROPERTY(FactGroup*           setpoint        READ setpointFactGroup          CONSTANT)
@@ -563,6 +565,7 @@ public:
     FactGroup* windFactGroup                ();
     FactGroup* vibrationFactGroup           ();
     FactGroup* engagementStatusFactGroup    ();   // STRATUM
+    FactGroup* visionEngagementStatusFactGroup ();   // STRATUM
     FactGroup* temperatureFactGroup         ();
     FactGroup* clockFactGroup               ();
     FactGroup* setpointFactGroup            ();
@@ -1081,6 +1084,7 @@ public:
     const QString _windFactGroupName =               QStringLiteral("wind");
     const QString _vibrationFactGroupName =          QStringLiteral("vibration");
     const QString _engagementStatusFactGroupName =   QStringLiteral("engagementStatus");   // STRATUM
+    const QString _visionEngagementStatusFactGroupName = QStringLiteral("visionEngagementStatus");   // STRATUM
     const QString _temperatureFactGroupName =        QStringLiteral("temperature");
     const QString _clockFactGroupName =              QStringLiteral("clock");
     const QString _setpointFactGroupName =           QStringLiteral("setpoint");
@@ -1102,6 +1106,7 @@ public:
     VehicleWindFactGroup*               _windFactGroup              = nullptr;
     VehicleVibrationFactGroup*          _vibrationFactGroup         = nullptr;
     VehicleEngagementStatusFactGroup*   _engagementStatusFactGroup  = nullptr;   // STRATUM
+    VehicleVisionEngagementStatusFactGroup* _visionEngagementStatusFactGroup = nullptr;   // STRATUM
     VehicleTemperatureFactGroup*        _temperatureFactGroup       = nullptr;
     VehicleClockFactGroup*              _clockFactGroup             = nullptr;
     VehicleSetpointFactGroup*           _setpointFactGroup          = nullptr;

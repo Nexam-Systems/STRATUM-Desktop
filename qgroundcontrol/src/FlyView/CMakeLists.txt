@@ -16,6 +16,9 @@ qt_add_qml_module(FlyViewModule
         EngagementAbortOverlay.qml
         EngagementController.qml
         EngagementCountdown.qml
+        VisionEngageAction.qml
+        VisionEngagementOverlay.qml
+        VisionEngagementStatus.qml
         FixedWingChecklist.qml
         FlightDisplayViewDummy.qml
         FlightDisplayViewVideoOutput.qml

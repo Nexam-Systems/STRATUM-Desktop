@@ -44,6 +44,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
     const QString orbitFlightModeName = tr("Orbit");
     const QString standoffFlightModeName = tr("Standoff");
     const QString engagementFlightModeName = tr("Engagement");
+    const QString visionEngagementFlightModeName = tr("Vision Engagement");
     const QString abortFlightModeName = tr("Abort");
 
     _setModeEnumToModeStringMapping({
@@ -66,6 +67,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
         { PX4CustomMode::AUTO_TAKEOFF,  takeoffFlightModeName     },
         { PX4CustomMode::AUTO_STANDOFF, standoffFlightModeName    },
         { PX4CustomMode::AUTO_ENGAGEMENT, engagementFlightModeName },
+        { PX4CustomMode::AUTO_VISION_ENGAGEMENT, visionEngagementFlightModeName },
         { PX4CustomMode::AUTO_ABORT,    abortFlightModeName       },
     });
 
@@ -90,6 +92,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
         { takeoffFlightModeName,    PX4CustomMode::AUTO_TAKEOFF,    false,  false},
         { standoffFlightModeName,   PX4CustomMode::AUTO_STANDOFF,   true,   true },
         { engagementFlightModeName, PX4CustomMode::AUTO_ENGAGEMENT, true,   true },
+        { visionEngagementFlightModeName, PX4CustomMode::AUTO_VISION_ENGAGEMENT, true, true },
         { abortFlightModeName,      PX4CustomMode::AUTO_ABORT,      true,   true },
     };
 
@@ -795,9 +798,10 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
     // classification loop and _updateFlightModeList treat them like any other mode:
     // the status bar can name them, they show in the menu, and setFlightMode() finds them.
     const struct { PX4CustomMode::Mode mode; const char *name; } stratumModes[] = {
-        { PX4CustomMode::AUTO_STANDOFF,   "Standoff"   },
-        { PX4CustomMode::AUTO_ENGAGEMENT, "Engagement" },
-        { PX4CustomMode::AUTO_ABORT,      "Abort"      },
+        { PX4CustomMode::AUTO_STANDOFF,          "Standoff"          },
+        { PX4CustomMode::AUTO_ENGAGEMENT,        "Engagement"        },
+        { PX4CustomMode::AUTO_VISION_ENGAGEMENT, "Vision Engagement" },
+        { PX4CustomMode::AUTO_ABORT,             "Abort"             },
     };
     for (const auto &sm : stratumModes) {
         bool present = false;
@@ -835,6 +839,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_TAKEOFF      :
         case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
         case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
+        case PX4CustomMode::AUTO_VISION_ENGAGEMENT: // STRATUM
         case PX4CustomMode::AUTO_ABORT        :   // STRATUM
             mode.multiRotor = true;
             break;
@@ -867,6 +872,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_TAKEOFF      :
         case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
         case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
+        case PX4CustomMode::AUTO_VISION_ENGAGEMENT: // STRATUM
         case PX4CustomMode::AUTO_ABORT        :   // STRATUM
             mode.fixedWing = true;
             break;

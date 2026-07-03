@@ -39,7 +39,9 @@ enum PX4_CUSTOM_SUB_MODE_AUTO {
 	// STRATUM: append-only, kept in lock-step with firmware ordering so ENGAGEMENT resolves to 21.
 	PX4_CUSTOM_SUB_MODE_AUTO_ENGAGEMENT,       // 21
 	// STRATUM: append-only, kept in lock-step with firmware ordering so ABORT resolves to 22.
-	PX4_CUSTOM_SUB_MODE_AUTO_ABORT             // 22
+	PX4_CUSTOM_SUB_MODE_AUTO_ABORT,            // 22
+	// STRATUM: append-only, kept in lock-step with firmware ordering so VISION_ENGAGEMENT resolves to 23.
+	PX4_CUSTOM_SUB_MODE_AUTO_VISION_ENGAGEMENT // 23
 };
 
 enum PX4_CUSTOM_SUB_MODE_POSCTL {
@@ -84,5 +86,6 @@ struct PX4CustomMode{
         AUTO_STANDOFF       = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_STANDOFF      << 24 ),
         AUTO_ENGAGEMENT     = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_ENGAGEMENT    << 24 ),
         AUTO_ABORT          = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_ABORT         << 24 ),
+        AUTO_VISION_ENGAGEMENT = PX4_CUSTOM_MAIN_MODE_AUTO      <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_VISION_ENGAGEMENT << 24 ),
     };
 };

@@ -30,8 +30,9 @@ Item {
 
     // Mode display names MUST match the PX4FirmwarePlugin registration strings
     // (PX4FirmwarePlugin.cc constructor + updateAvailableFlightModes re-injection).
-    readonly property string engagementModeName: qsTr("Engagement")
-    readonly property string abortModeName:      qsTr("Abort")
+    readonly property string engagementModeName:       qsTr("Engagement")
+    readonly property string visionEngagementModeName: qsTr("Vision Engagement")
+    readonly property string abortModeName:            qsTr("Abort")
 
     // Abort-destination selection, mirroring the PX4 ABRT_* parameters.
     //   abortDest 0 = recover to the last standoff point (no lat/lon needed)
@@ -54,6 +55,13 @@ Item {
     // ENGAGEMENT_STATUS dive state) per the contract.
     readonly property bool engaged:
         !!_activeVehicle && _activeVehicle.flightMode === engagementModeName
+
+    // UI gate: true while the vehicle is in the vision-engagement mode (sub 23). The
+    // vision guidance panel and its (reused) ABORT control key off this and the
+    // VISION_ENGAGEMENT_STATUS state per the contract. Vision Engagement is a SEPARATE
+    // mode from coordinate Engagement; the two are mutually exclusive.
+    readonly property bool visionEngaged:
+        !!_activeVehicle && _activeVehicle.flightMode === visionEngagementModeName
 
     // Parameter access. A bare FactPanelController targets the active vehicle and
     // routes value writes through ParameterManager (confirmed PARAM_SET).
@@ -111,6 +119,20 @@ Item {
         }
         _ensureArmed()
         _activeVehicle.flightMode = engagementModeName
+    }
+
+    // Vision Engagement (custom sub_mode 23): a camera-guided run with NO target
+    // coordinate. STRATUM only commands the mode -- the vehicle takes its target from
+    // the companion camera tracker. The abort loop and the arm-on-engage safety are
+    // REUSED unchanged from coordinate Engagement (contract A2/Task 6): same
+    // _ensureArmed() push, same abort() below. Do NOT send DO_STANDOFF here -- vision
+    // engagement has no map target (contract A1).
+    function visionEngage() {
+        if (!_activeVehicle) {
+            return
+        }
+        _ensureArmed()
+        _activeVehicle.flightMode = visionEngagementModeName
     }
 
     // Operator-initiated break-off. Deliberately independent of any valid

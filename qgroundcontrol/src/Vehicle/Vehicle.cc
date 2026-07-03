@@ -20,6 +20,7 @@
 #include "VehicleTemperatureFactGroup.h"
 #include "VehicleVibrationFactGroup.h"
 #include "VehicleEngagementStatusFactGroup.h"   // STRATUM
+#include "VehicleVisionEngagementStatusFactGroup.h"   // STRATUM
 #include "VehicleWindFactGroup.h"
 #include "VehicleSupports.h"
 #include "ADSBVehicleManager.h"
@@ -315,6 +316,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _windFactGroup                  = new VehicleWindFactGroup(this);
     _vibrationFactGroup             = new VehicleVibrationFactGroup(this);
     _engagementStatusFactGroup      = new VehicleEngagementStatusFactGroup(this);   // STRATUM
+    _visionEngagementStatusFactGroup = new VehicleVisionEngagementStatusFactGroup(this);   // STRATUM
     _temperatureFactGroup           = new VehicleTemperatureFactGroup(this);
     _clockFactGroup                 = new VehicleClockFactGroup(this);
     _setpointFactGroup              = new VehicleSetpointFactGroup(this);
@@ -350,6 +352,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _addFactGroup(_windFactGroup,              _windFactGroupName);
     _addFactGroup(_vibrationFactGroup,         _vibrationFactGroupName);
     _addFactGroup(_engagementStatusFactGroup,  _engagementStatusFactGroupName);   // STRATUM
+    _addFactGroup(_visionEngagementStatusFactGroup, _visionEngagementStatusFactGroupName);   // STRATUM
     _addFactGroup(_temperatureFactGroup,       _temperatureFactGroupName);
     _addFactGroup(_clockFactGroup,             _clockFactGroupName);
     _addFactGroup(_setpointFactGroup,          _setpointFactGroupName);
@@ -417,6 +420,7 @@ FactGroup* Vehicle::gpsAggregateFactGroup()         { return _gpsAggregateFactGr
 FactGroup* Vehicle::windFactGroup()                 { return _windFactGroup; }
 FactGroup* Vehicle::vibrationFactGroup()            { return _vibrationFactGroup; }
 FactGroup* Vehicle::engagementStatusFactGroup()     { return _engagementStatusFactGroup; }   // STRATUM
+FactGroup* Vehicle::visionEngagementStatusFactGroup() { return _visionEngagementStatusFactGroup; }   // STRATUM
 FactGroup* Vehicle::temperatureFactGroup()          { return _temperatureFactGroup; }
 FactGroup* Vehicle::clockFactGroup()                { return _clockFactGroup; }
 FactGroup* Vehicle::setpointFactGroup()             { return _setpointFactGroup; }

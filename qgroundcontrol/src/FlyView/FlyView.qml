@@ -251,6 +251,17 @@ Item {
             topMargin:               toolbar.height + (_toolsMargin * 3)
         }
 
+        // STRATUM: vision-engagement status + abort overlay. Same top-centre slot as the
+        // coordinate-engagement overlay above; the two are mutually exclusive by mode, so
+        // only one is ever visible. Carries the VISION ENGAGING! banner, the 42002-driven
+        // guidance panel, and the SHARED HOLD-TO-ABORT control (contract Task 5 -- one
+        // abort path, not a fork).
+        VisionEngagementOverlay {
+            id:                     visionEngagementOverlay
+            engagementController:    engagementController
+            topMargin:               toolbar.height + (_toolsMargin * 3)
+        }
+
         Loader {
             id:           viewer3DLoader
             z:            1

@@ -56,7 +56,7 @@ RowLayout {
             if (mode === qsTr("Abort")) {
                 return _abortText
             }
-            if (mode === qsTr("Engagement")) {
+            if (mode === qsTr("Engagement") || mode === qsTr("Vision Engagement")) {
                 return _engagingText
             }
             if (mode === qsTr("Standoff") || mode === qsTr("Takeoff") ||

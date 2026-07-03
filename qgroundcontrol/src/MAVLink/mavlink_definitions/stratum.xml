@@ -12,12 +12,12 @@
   QGC_MAVLINK_DIALECT is set to "stratum" in cmake/CustomOptions.cmake so mavgen
   generates this dialect.
 
-  CRC parity: ENGAGEMENT_STATUS below is byte-for-byte the contract definition
-  (B1). CRC_EXTRA is a pure function of the message name plus each field's type and
-  name in wire-sorted order, independent of file, surrounding dialect, or message
-  id. Keeping the field block identical to the PX4 firmware definition guarantees
-  the vehicle and the ground station agree, so frames are accepted rather than
-  silently dropped. Do NOT reorder fields or rename anything.
+  CRC parity: ENGAGEMENT_STATUS and VISION_ENGAGEMENT_STATUS below are byte-for-byte
+  the contract definitions (B1). CRC_EXTRA is a pure function of the message name plus
+  each field's type and name in wire-sorted order, independent of file, surrounding
+  dialect, or message id. Keeping the field block identical to the PX4 firmware
+  definition guarantees the vehicle and the ground station agree, so frames are
+  accepted rather than silently dropped. Do NOT reorder fields or rename anything.
 -->
 <mavlink>
   <include>all.xml</include>
@@ -29,6 +29,17 @@
       <field type="float" name="range" units="m" invalid="NaN">Slant range from the vehicle to the target. NaN if unknown.</field>
       <field type="float" name="closing_speed" units="m/s" invalid="NaN">Closing speed along the line of sight, positive when closing. NaN if unknown.</field>
       <field type="uint8_t" name="valid">1 if time_to_impact is a usable estimate, 0 otherwise.</field>
+    </message>
+    <message id="42002" name="VISION_ENGAGEMENT_STATUS">
+      <description>Vision-aided engagement guidance status. Line-of-sight regulation state and the range/time-to-impact estimates used by the ground station during a camera-guided terminal run.</description>
+      <field type="uint8_t" name="state">Guidance state: 0=SEARCH, 1=TRACK, 2=COAST, 3=TERMINAL, 4=ABORT.</field>
+      <field type="float" name="eps_az" units="rad" invalid="NaN">Azimuth line-of-sight error from boresight, positive right.</field>
+      <field type="float" name="eps_el" units="rad" invalid="NaN">Elevation line-of-sight error from boresight, positive below.</field>
+      <field type="float" name="range" units="m" invalid="NaN">Slant range estimate to the target. NaN if unknown.</field>
+      <field type="float" name="closing_speed" units="m/s" invalid="NaN">Closing speed along the line of sight, positive when closing. NaN if unknown.</field>
+      <field type="float" name="time_to_impact" units="s" invalid="NaN">Estimated time until impact. NaN if not estimable.</field>
+      <field type="uint8_t" name="tti_valid">1 if time_to_impact is a usable estimate, 0 otherwise.</field>
+      <field type="uint8_t" name="track_quality">Track confidence 0..255 (255 = 1.0). 0 when no lock.</field>
     </message>
   </messages>
 </mavlink>

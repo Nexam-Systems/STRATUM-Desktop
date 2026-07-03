@@ -1,0 +1,57 @@
+{
+    "version":      1,
+    "fileType":     "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "state",
+    "shortDesc":        "Guidance state (0=SEARCH, 1=TRACK, 2=COAST, 3=TERMINAL, 4=ABORT)",
+    "type":             "uint8"
+},
+{
+    "name":             "epsAz",
+    "shortDesc":        "Azimuth line-of-sight error from boresight, positive right",
+    "type":             "float",
+    "units":            "rad",
+    "decimalPlaces":    3
+},
+{
+    "name":             "epsEl",
+    "shortDesc":        "Elevation line-of-sight error from boresight, positive below",
+    "type":             "float",
+    "units":            "rad",
+    "decimalPlaces":    3
+},
+{
+    "name":             "range",
+    "shortDesc":        "Slant range to target",
+    "type":             "float",
+    "units":            "m",
+    "decimalPlaces":    1
+},
+{
+    "name":             "closingSpeed",
+    "shortDesc":        "Closing speed along line of sight",
+    "type":             "float",
+    "units":            "m/s",
+    "decimalPlaces":    1
+},
+{
+    "name":             "timeToImpact",
+    "shortDesc":        "Estimated time to impact",
+    "type":             "float",
+    "units":            "s",
+    "decimalPlaces":    1
+},
+{
+    "name":             "ttiValid",
+    "shortDesc":        "1 if timeToImpact is a usable estimate",
+    "type":             "uint8"
+},
+{
+    "name":             "trackQuality",
+    "shortDesc":        "Track confidence 0..255 (255 = 1.0); 0 when no lock",
+    "type":             "uint8"
+}
+]
+}

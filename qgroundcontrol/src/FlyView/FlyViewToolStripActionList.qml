@@ -42,6 +42,20 @@ ToolStripActionList {
                 }
             }
         },
+        // STRATUM: dedicated trigger for the PX4 custom "Vision Engagement" flight mode
+        // (sub=23) -- a camera-guided run with no map target. One tap commits the vehicle;
+        // the vision guidance overlay (FlyView) confirms the active state. Routed through
+        // the SAME engagement controller so the abort destination is armed before commit
+        // (arm-on-engage reuse); it never sends a target coordinate.
+        VisionEngageAction {
+            onTriggered: {
+                if (_root.engagementController) {
+                    _root.engagementController.visionEngage()
+                } else if (QGroundControl.multiVehicleManager.activeVehicle) {
+                    QGroundControl.multiVehicleManager.activeVehicle.flightMode = qsTr("Vision Engagement")
+                }
+            }
+        },
         GuidedActionAbort { }               // PX4 custom "Abort" flight mode (sub=22)
     ]
 }
