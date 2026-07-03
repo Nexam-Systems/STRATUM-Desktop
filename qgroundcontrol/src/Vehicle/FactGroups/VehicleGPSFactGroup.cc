@@ -14,6 +14,8 @@ VehicleGPSFactGroup::VehicleGPSFactGroup(QObject *parent)
     _addFact(&_mgrsFact);
     _addFact(&_hdopFact);
     _addFact(&_vdopFact);
+    _addFact(&_horizontalAccuracyFact);
+    _addFact(&_verticalAccuracyFact);
     _addFact(&_courseOverGroundFact);
     _addFact(&_yawFact);
     _addFact(&_lockFact);
@@ -32,6 +34,8 @@ VehicleGPSFactGroup::VehicleGPSFactGroup(QObject *parent)
     _mgrsFact.setRawValue("");
     _hdopFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _vdopFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
+    _horizontalAccuracyFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
+    _verticalAccuracyFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _courseOverGroundFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _yawFact.setRawValue(std::numeric_limits<int16_t>::quiet_NaN());
     _spoofingStateFact.setRawValue(255);
@@ -76,6 +80,9 @@ void VehicleGPSFactGroup::_handleGpsRawInt(const mavlink_message_t &message)
     count()->setRawValue((gpsRawInt.satellites_visible == 255) ? 0 : gpsRawInt.satellites_visible);
     hdop()->setRawValue((gpsRawInt.eph == UINT16_MAX) ? qQNaN() : (gpsRawInt.eph / 100.0));
     vdop()->setRawValue((gpsRawInt.epv == UINT16_MAX) ? qQNaN() : (gpsRawInt.epv / 100.0));
+    // h_acc/v_acc are GPS_RAW_INT extension fields in mm (0 means not provided). Stored in meters.
+    horizontalAccuracy()->setRawValue((gpsRawInt.h_acc == 0) ? qQNaN() : (gpsRawInt.h_acc / 1000.0));
+    verticalAccuracy()->setRawValue((gpsRawInt.v_acc == 0) ? qQNaN() : (gpsRawInt.v_acc / 1000.0));
     courseOverGround()->setRawValue((gpsRawInt.cog == UINT16_MAX) ? qQNaN() : (gpsRawInt.cog / 100.0));
     yaw()->setRawValue((gpsRawInt.yaw == UINT16_MAX) ? qQNaN() : (gpsRawInt.yaw / 100.0));
     lock()->setRawValue(gpsRawInt.fix_type);

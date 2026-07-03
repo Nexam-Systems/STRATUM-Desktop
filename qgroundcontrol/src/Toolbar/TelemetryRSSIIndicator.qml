@@ -5,29 +5,49 @@ import QGroundControl
 import QGroundControl.Controls
 
 //-------------------------------------------------------------------------
-//-- Telemetry RSSI
+//-- Telemetry / Network Link RSSI
 Item {
     id:             control
     objectName:     "toolbar_telemetryRSSIIndicator"
     anchors.top:    parent.top
     anchors.bottom: parent.bottom
-    width:          telemIcon.width * 1.1
+    width:          telemRow.width * 1.1
 
-    property bool showIndicator: _hasTelemetry
+    // STRATUM: show the network/telemetry link strength whenever the vehicle uses a radio
+    // link, so operators always have a link indicator (bars grey out when no live data).
+    property bool showIndicator: _activeVehicle.supports.radio || _hasTelemetry
 
     property var  _activeVehicle:   QGroundControl.multiVehicleManager.activeVehicle
     property var  _radioStatus:     _activeVehicle.radioStatus
     property bool _hasTelemetry:    _radioStatus.lrssi.rawValue !== 0
 
-    QGCColoredImage {
-        id:                 telemIcon
-        anchors.top:        parent.top
-        anchors.bottom:     parent.bottom
-        width:              height
-        sourceSize.height:  height
-        source:             "/qmlimages/TelemRSSI.svg"
-        fillMode:           Image.PreserveAspectFit
-        color:              qgcPal.buttonText
+    // RADIO_STATUS rssi is reported as a 0-255 raw value (higher is stronger). Map to a
+    // 0-100 percentage for the shared SignalStrength bar visual.
+    property real _linkPercent:     _hasTelemetry ? Math.max(0, Math.min(100, _radioStatus.lrssi.rawValue * (100.0 / 255.0))) : 0
+
+    Row {
+        id:             telemRow
+        anchors.top:    parent.top
+        anchors.bottom: parent.bottom
+        spacing:        ScreenTools.defaultFontPixelWidth
+
+        QGCColoredImage {
+            id:                 telemIcon
+            anchors.top:        parent.top
+            anchors.bottom:     parent.bottom
+            width:              height
+            sourceSize.height:  height
+            source:             "/qmlimages/TelemRSSI.svg"
+            fillMode:           Image.PreserveAspectFit
+            opacity:            _hasTelemetry ? 1 : 0.5
+            color:              qgcPal.buttonText
+        }
+
+        SignalStrength {
+            anchors.verticalCenter: parent.verticalCenter
+            size:                   parent.height * 0.5
+            percent:                _linkPercent
+        }
     }
 
     MouseArea {

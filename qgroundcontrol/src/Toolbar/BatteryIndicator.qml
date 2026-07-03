@@ -311,14 +311,60 @@ Item {
                 }
             }
 
-            QGCColoredImage {
+            // STRATUM: circular battery dial (ring gauge) with centered percentage,
+            // replacing the flat battery SVG. Ring colour still follows charge-state logic.
+            Item {
+                id:                 batteryDial
                 anchors.top:        parent.top
                 anchors.bottom:     parent.bottom
                 width:              height
-                sourceSize.width:   width
-                source:             getBatterySvgSource()
-                fillMode:           Image.PreserveAspectFit
-                color:              getBatteryColor()
+
+                property real  dialPct:   isNaN(battery.percentRemaining.rawValue) ? 0 : battery.percentRemaining.rawValue
+                property color dialColor: getBatteryColor()
+                property bool  pctKnown:  !isNaN(battery.percentRemaining.rawValue)
+
+                onDialPctChanged:   ringCanvas.requestPaint()
+                onDialColorChanged: ringCanvas.requestPaint()
+
+                Canvas {
+                    id:             ringCanvas
+                    anchors.fill:   parent
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
+                        var cx = width / 2
+                        var cy = height / 2
+                        var lw = Math.max(2, width * 0.12)
+                        var r  = Math.min(width, height) / 2 - lw
+                        // Background track
+                        ctx.beginPath()
+                        ctx.lineWidth   = lw
+                        ctx.strokeStyle = qgcPal.text
+                        ctx.globalAlpha = 0.25
+                        ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                        ctx.stroke()
+                        // Charge arc
+                        ctx.globalAlpha = 1.0
+                        ctx.beginPath()
+                        ctx.lineWidth   = lw
+                        ctx.lineCap     = "round"
+                        ctx.strokeStyle = batteryDial.dialColor
+                        var start = -Math.PI / 2
+                        var pct   = Math.max(0, Math.min(100, batteryDial.dialPct))
+                        ctx.arc(cx, cy, r, start, start + (2 * Math.PI) * pct / 100)
+                        ctx.stroke()
+                    }
+                    onWidthChanged:  requestPaint()
+                    onHeightChanged: requestPaint()
+                    Component.onCompleted: requestPaint()
+                }
+
+                QGCLabel {
+                    anchors.centerIn:   parent
+                    color:              qgcPal.text
+                    font.pointSize:     ScreenTools.smallFontPointSize
+                    text:               batteryDial.pctKnown ? (Math.round(batteryDial.dialPct) + "%") : ""
+                }
             }
 
            ColumnLayout {
@@ -333,7 +379,7 @@ Item {
                     color:                  qgcPal.text
                     text:                   getBatteryPercentageText()
                     font.pointSize:         _showBoth ? ScreenTools.defaultFontPointSize : ScreenTools.mediumFontPointSize
-                    visible:                _showBoth || _showPercentage
+                    visible:                false // STRATUM: percentage is displayed inside the battery dial
                 }
 
                 QGCLabel {

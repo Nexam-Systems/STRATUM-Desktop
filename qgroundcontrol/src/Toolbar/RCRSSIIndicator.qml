@@ -12,7 +12,9 @@ Item {
     anchors.top:    parent.top
     anchors.bottom: parent.bottom
 
-    property bool showIndicator: _activeVehicle.supports.radio && _rcRSSIAvailable
+    // STRATUM: keep the RC RSSI / signal-strength widget on the bar whenever the vehicle
+    // supports a radio link. Bars grey out (percent 0) when no live RSSI is available.
+    property bool showIndicator: _activeVehicle.supports.radio
 
     property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
     property bool   _rcRSSIAvailable:   _activeVehicle.rcRSSI.rawValue > 0 && _activeVehicle.rcRSSI.rawValue <= 100

@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import QGroundControl
 import QGroundControl.Controls
 
-// Used as the base class control for nboth VehicleGPSIndicator and RTKGPSIndicator
+// Used as the base class control for both VehicleGPSIndicator and RTKGPSIndicator
 
 Item {
     id:             control
@@ -14,6 +14,15 @@ Item {
 
     property var    _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     property bool   _rtkConnected:  QGroundControl.gpsRtk.connected.value
+
+    // STRATUM: toolbar shows horizontal/vertical accuracy in centimeters plus satellite count,
+    // instead of the older HDOP dilution-of-precision figure.
+    property var    _gps:           _activeVehicle ? _activeVehicle.gps : null
+    property real   _hAccM:         _gps ? _gps.horizontalAccuracy.value : NaN
+    property real   _vAccM:         _gps ? _gps.verticalAccuracy.value   : NaN
+    property string _hAccText:      (_gps && !isNaN(_hAccM)) ? (Math.round(_hAccM * 100) + " " + qsTr("cm")) : qsTr("--")
+    property string _vAccText:      (_gps && !isNaN(_vAccM)) ? (Math.round(_vAccM * 100) + " " + qsTr("cm")) : qsTr("--")
+    property string _nSatText:      _gps ? _gps.count.valueString : qsTr("--")
 
     QGCPalette { id: qgcPal }
 
@@ -50,22 +59,48 @@ Item {
             }
         }
 
-        Column {
-            id:                     gpsValuesColumn
+        GridLayout {
+            id:                     gpsValuesGrid
             anchors.verticalCenter: parent.verticalCenter
-            visible:                _activeVehicle && !isNaN(_activeVehicle.gps.hdop.value)
-            spacing:                0
+            visible:                _gps && _gps.telemetryAvailable
+            columns:                2
+            rowSpacing:             0
+            columnSpacing:          ScreenTools.defaultFontPixelWidth / 2
 
             QGCLabel {
-                anchors.horizontalCenter:   hdopValue.horizontalCenter
+                text:               qsTr("HAcc")
                 color:              qgcPal.text
-                text:               _activeVehicle ? _activeVehicle.gps.count.valueString : ""
+                font.pointSize:     ScreenTools.smallFontPointSize
+            }
+            QGCLabel {
+                text:               _hAccText
+                color:              qgcPal.text
+                font.pointSize:     ScreenTools.smallFontPointSize
+                Layout.alignment:   Qt.AlignRight
             }
 
             QGCLabel {
-                id:     hdopValue
-                color:  qgcPal.text
-                text:   _activeVehicle ? _activeVehicle.gps.hdop.value.toFixed(1) : ""
+                text:               qsTr("VAcc")
+                color:              qgcPal.text
+                font.pointSize:     ScreenTools.smallFontPointSize
+            }
+            QGCLabel {
+                text:               _vAccText
+                color:              qgcPal.text
+                font.pointSize:     ScreenTools.smallFontPointSize
+                Layout.alignment:   Qt.AlignRight
+            }
+
+            QGCLabel {
+                text:               qsTr("Nsat")
+                color:              qgcPal.text
+                font.pointSize:     ScreenTools.smallFontPointSize
+            }
+            QGCLabel {
+                text:               _nSatText
+                color:              qgcPal.text
+                font.pointSize:     ScreenTools.smallFontPointSize
+                Layout.alignment:   Qt.AlignRight
             }
         }
     }
