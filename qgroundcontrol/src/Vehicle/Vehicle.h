@@ -242,6 +242,7 @@ public:
     Q_PROPERTY(FactGroup*           vibration       READ vibrationFactGroup         CONSTANT)
     Q_PROPERTY(FactGroup*           engagementStatus READ engagementStatusFactGroup CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           visionEngagementStatus READ visionEngagementStatusFactGroup CONSTANT)   // STRATUM
+    Q_PROPERTY(FactGroup*           targetTrack     READ targetTrackFactGroup       CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           temperature     READ temperatureFactGroup       CONSTANT)
     Q_PROPERTY(FactGroup*           clock           READ clockFactGroup             CONSTANT)
     Q_PROPERTY(FactGroup*           setpoint        READ setpointFactGroup          CONSTANT)
@@ -395,6 +396,12 @@ public:
 
     /// Sends PARAM_MAP_RC message to vehicle
     Q_INVOKABLE void sendParamMapRC(const QString& paramName, double scale, double centerValue, int tuningID, double minValue, double maxValue);
+
+    /// STRATUM: send an operator visual target designation (NEXAM_TARGET_SELECT / 42003)
+    /// to the companion tracker. Coordinates are normalized to the video frame
+    /// (0..1, origin top-left). action: 1 = SELECT/start, 0 = CANCEL/stop.
+    /// Called from the FlyView video overlay when the operator clicks or drags a box.
+    Q_INVOKABLE void sendTargetSelect(double topLeftX, double topLeftY, double botRightX, double botRightY, int action = 1);
 
     /// Clears all PARAM_MAP_RC settings from vehicle
     Q_INVOKABLE void clearAllParamMapRC(void);
@@ -566,6 +573,7 @@ public:
     FactGroup* vibrationFactGroup           ();
     FactGroup* engagementStatusFactGroup    ();   // STRATUM
     FactGroup* visionEngagementStatusFactGroup ();   // STRATUM
+    FactGroup* targetTrackFactGroup         ();   // STRATUM
     FactGroup* temperatureFactGroup         ();
     FactGroup* clockFactGroup               ();
     FactGroup* setpointFactGroup            ();
@@ -1085,6 +1093,7 @@ public:
     const QString _vibrationFactGroupName =          QStringLiteral("vibration");
     const QString _engagementStatusFactGroupName =   QStringLiteral("engagementStatus");   // STRATUM
     const QString _visionEngagementStatusFactGroupName = QStringLiteral("visionEngagementStatus");   // STRATUM
+    const QString _targetTrackFactGroupName =        QStringLiteral("targetTrack");   // STRATUM
     const QString _temperatureFactGroupName =        QStringLiteral("temperature");
     const QString _clockFactGroupName =              QStringLiteral("clock");
     const QString _setpointFactGroupName =           QStringLiteral("setpoint");
@@ -1107,6 +1116,7 @@ public:
     VehicleVibrationFactGroup*          _vibrationFactGroup         = nullptr;
     VehicleEngagementStatusFactGroup*   _engagementStatusFactGroup  = nullptr;   // STRATUM
     VehicleVisionEngagementStatusFactGroup* _visionEngagementStatusFactGroup = nullptr;   // STRATUM
+    VehicleTargetTrackFactGroup*        _targetTrackFactGroup       = nullptr;   // STRATUM
     VehicleTemperatureFactGroup*        _temperatureFactGroup       = nullptr;
     VehicleClockFactGroup*              _clockFactGroup             = nullptr;
     VehicleSetpointFactGroup*           _setpointFactGroup          = nullptr;

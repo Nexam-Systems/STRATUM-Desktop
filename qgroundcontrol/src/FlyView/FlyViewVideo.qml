@@ -82,6 +82,17 @@ Item {
         videoHeight:             videoStreaming.getHeight()
     }
 
+    //-- STRATUM: operator visual target designation. Sends NEXAM_TARGET_SELECT on
+    //   click/drag and renders the tracked box streamed back by the companion. Works
+    //   without a MAVLink camera (the tracker lives on the companion computer).
+    TargetTrackingOverlay {
+        id:                      targetTrackingOverlay
+        anchors.fill:            parent
+        vehicle:                 QGroundControl.multiVehicleManager.activeVehicle
+        videoWidth:              videoStreaming.getWidth()
+        videoHeight:             videoStreaming.getHeight()
+    }
+
     MouseArea {
         id:                         flyViewVideoMouseArea
         anchors.fill:               parent
@@ -105,10 +116,12 @@ Item {
                 _dragging = true
                 onScreenGimbalController.mouseDragStart(_pressX, _pressY)
                 cameraTrackingController.mouseDragStart(_pressX, _pressY)
+                targetTrackingOverlay.mouseDragStart(_pressX, _pressY)
             }
             if (_dragging) {
                 onScreenGimbalController.mouseDragPositionChanged(mouse.x, mouse.y)
                 cameraTrackingController.mouseDragPositionChanged(mouse.x, mouse.y)
+                targetTrackingOverlay.mouseDragPositionChanged(mouse.x, mouse.y)
             }
         }
 
@@ -116,9 +129,11 @@ Item {
             if (_dragging) {
                 onScreenGimbalController.mouseDragEnd()
                 cameraTrackingController.mouseDragEnd(mouse.x, mouse.y)
+                targetTrackingOverlay.mouseDragEnd(mouse.x, mouse.y)
             } else {
                 onScreenGimbalController.mouseClicked(mouse.x, mouse.y)
                 cameraTrackingController.mouseClicked(mouse.x, mouse.y)
+                targetTrackingOverlay.mouseClicked(mouse.x, mouse.y)
             }
             _dragging = false
         }

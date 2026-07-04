@@ -21,6 +21,7 @@
 #include "VehicleVibrationFactGroup.h"
 #include "VehicleEngagementStatusFactGroup.h"   // STRATUM
 #include "VehicleVisionEngagementStatusFactGroup.h"   // STRATUM
+#include "VehicleTargetTrackFactGroup.h"   // STRATUM
 #include "VehicleWindFactGroup.h"
 #include "VehicleSupports.h"
 #include "ADSBVehicleManager.h"
@@ -317,6 +318,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _vibrationFactGroup             = new VehicleVibrationFactGroup(this);
     _engagementStatusFactGroup      = new VehicleEngagementStatusFactGroup(this);   // STRATUM
     _visionEngagementStatusFactGroup = new VehicleVisionEngagementStatusFactGroup(this);   // STRATUM
+    _targetTrackFactGroup           = new VehicleTargetTrackFactGroup(this);   // STRATUM
     _temperatureFactGroup           = new VehicleTemperatureFactGroup(this);
     _clockFactGroup                 = new VehicleClockFactGroup(this);
     _setpointFactGroup              = new VehicleSetpointFactGroup(this);
@@ -353,6 +355,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _addFactGroup(_vibrationFactGroup,         _vibrationFactGroupName);
     _addFactGroup(_engagementStatusFactGroup,  _engagementStatusFactGroupName);   // STRATUM
     _addFactGroup(_visionEngagementStatusFactGroup, _visionEngagementStatusFactGroupName);   // STRATUM
+    _addFactGroup(_targetTrackFactGroup,       _targetTrackFactGroupName);   // STRATUM
     _addFactGroup(_temperatureFactGroup,       _temperatureFactGroupName);
     _addFactGroup(_clockFactGroup,             _clockFactGroupName);
     _addFactGroup(_setpointFactGroup,          _setpointFactGroupName);
@@ -421,6 +424,7 @@ FactGroup* Vehicle::windFactGroup()                 { return _windFactGroup; }
 FactGroup* Vehicle::vibrationFactGroup()            { return _vibrationFactGroup; }
 FactGroup* Vehicle::engagementStatusFactGroup()     { return _engagementStatusFactGroup; }   // STRATUM
 FactGroup* Vehicle::visionEngagementStatusFactGroup() { return _visionEngagementStatusFactGroup; }   // STRATUM
+FactGroup* Vehicle::targetTrackFactGroup()          { return _targetTrackFactGroup; }   // STRATUM
 FactGroup* Vehicle::temperatureFactGroup()          { return _temperatureFactGroup; }
 FactGroup* Vehicle::clockFactGroup()                { return _clockFactGroup; }
 FactGroup* Vehicle::setpointFactGroup()             { return _setpointFactGroup; }
@@ -2975,6 +2979,46 @@ void Vehicle::sendParamMapRC(const QString& paramName, double scale, double cent
                                        static_cast<float>(scale),
                                        static_cast<float>(minValue),
                                        static_cast<float>(maxValue));
+    sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+}
+
+void Vehicle::sendTargetSelect(double topLeftX, double topLeftY, double botRightX, double botRightY, int action)
+{
+    // STRATUM: operator visual target designation. Packs NEXAM_TARGET_SELECT (42003)
+    // and sends it to the companion tracker over the vehicle's primary link. The
+    // companion (mission computer) initializes its OpenCV tracker from this box and
+    // then streams NEXAM_TARGET_TRACK (42004) back, decoded by
+    // VehicleTargetTrackFactGroup and drawn by the FlyView video overlay.
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        qCDebug(VehicleLog) << "sendTargetSelect: primary link gone!";
+        return;
+    }
+
+    // Monotonic selection id so the companion can distinguish re-designations.
+    static uint8_t targetSelectId = 0;
+    if (action != 0) {
+        targetSelectId++;
+    }
+
+    // Clamp to the normalized video frame; the overlay already normalizes, this is
+    // defence in depth against degenerate input.
+    const auto clamp01 = [](double v) { return static_cast<float>(v < 0.0 ? 0.0 : (v > 1.0 ? 1.0 : v)); };
+
+    mavlink_message_t message;
+    mavlink_msg_nexam_target_select_pack_chan(
+        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+        sharedLink->mavlinkChannel(),
+        &message,
+        clamp01(topLeftX),
+        clamp01(topLeftY),
+        clamp01(botRightX),
+        clamp01(botRightY),
+        static_cast<uint8_t>(_systemID),                 // target_system: companion shares the vehicle sysid
+        static_cast<uint8_t>(MAV_COMP_ID_ONBOARD_COMPUTER), // target_component: companion tracker
+        static_cast<uint8_t>(action),
+        targetSelectId);
     sendMessageOnLinkThreadSafe(sharedLink.get(), message);
 }
 
