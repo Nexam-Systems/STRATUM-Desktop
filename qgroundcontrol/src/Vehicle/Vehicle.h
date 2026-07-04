@@ -53,6 +53,7 @@ class VehicleVibrationFactGroup;
 class VehicleWindFactGroup;
 class VehicleEngagementStatusFactGroup;   // STRATUM
 class VehicleVisionEngagementStatusFactGroup;   // STRATUM
+class VehicleTargetTrackFactGroup;   // STRATUM
 class Autotune;
 class ComponentInformationManager;
 class MAVLinkEventManager;
