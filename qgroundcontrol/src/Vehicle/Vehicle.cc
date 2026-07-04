@@ -2985,13 +2985,35 @@ void Vehicle::sendParamMapRC(const QString& paramName, double scale, double cent
 void Vehicle::sendTargetSelect(double topLeftX, double topLeftY, double botRightX, double botRightY, int action)
 {
     // STRATUM: operator visual target designation. Packs NEXAM_TARGET_SELECT (42003)
-    // and sends it to the companion tracker over the vehicle's primary link. The
-    // companion (mission computer) initializes its OpenCV tracker from this box and
-    // then streams NEXAM_TARGET_TRACK (42004) back, decoded by
-    // VehicleTargetTrackFactGroup and drawn by the FlyView video overlay.
-    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
-    if (!sharedLink) {
-        qCDebug(VehicleLog) << "sendTargetSelect: primary link gone!";
+    // and sends it to the companion tracker. The companion (mission computer)
+    // initializes its OpenCV tracker from this box and then streams
+    // NEXAM_TARGET_TRACK (42004) back, decoded by VehicleTargetTrackFactGroup and
+    // drawn by the FlyView video overlay.
+    //
+    // Sent on EVERY link of the vehicle, not just the primary. In SITL the autopilot
+    // (PX4) and the companion tracker often reach STRATUM over different links (PX4
+    // direct, tracker via mavlink-router). The primary link is usually the autopilot's,
+    // which would swallow the designation. Broadcasting across all links guarantees the
+    // companion receives it regardless of topology; the autopilot simply ignores an
+    // unknown message id.
+    // VehicleLinkManager has no public link list, so take the app-wide links and keep
+    // the ones that belong to this vehicle.
+    QList<SharedLinkInterfacePtr> vehicleLinks;
+    const QList<SharedLinkInterfacePtr> allLinks = LinkManager::instance()->links();
+    for (const SharedLinkInterfacePtr &link : allLinks) {
+        if (link && vehicleLinkManager()->containsLink(link.get())) {
+            vehicleLinks.append(link);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        // Fall back to the primary link if the filter came up empty.
+        SharedLinkInterfacePtr primary = vehicleLinkManager()->primaryLink().lock();
+        if (primary) {
+            vehicleLinks.append(primary);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        qCDebug(VehicleLog) << "sendTargetSelect: no links!";
         return;
     }
 
@@ -3005,21 +3027,26 @@ void Vehicle::sendTargetSelect(double topLeftX, double topLeftY, double botRight
     // defence in depth against degenerate input.
     const auto clamp01 = [](double v) { return static_cast<float>(v < 0.0 ? 0.0 : (v > 1.0 ? 1.0 : v)); };
 
-    mavlink_message_t message;
-    mavlink_msg_nexam_target_select_pack_chan(
-        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
-        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
-        sharedLink->mavlinkChannel(),
-        &message,
-        clamp01(topLeftX),
-        clamp01(topLeftY),
-        clamp01(botRightX),
-        clamp01(botRightY),
-        static_cast<uint8_t>(_systemID),                 // target_system: companion shares the vehicle sysid
-        static_cast<uint8_t>(MAV_COMP_ID_ONBOARD_COMPUTER), // target_component: companion tracker
-        static_cast<uint8_t>(action),
-        targetSelectId);
-    sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    for (const SharedLinkInterfacePtr &link : vehicleLinks) {
+        if (!link) {
+            continue;
+        }
+        mavlink_message_t message;
+        mavlink_msg_nexam_target_select_pack_chan(
+            static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+            static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+            link->mavlinkChannel(),
+            &message,
+            clamp01(topLeftX),
+            clamp01(topLeftY),
+            clamp01(botRightX),
+            clamp01(botRightY),
+            static_cast<uint8_t>(_systemID),                    // target_system: companion shares the vehicle sysid
+            static_cast<uint8_t>(MAV_COMP_ID_ONBOARD_COMPUTER), // target_component: companion tracker
+            static_cast<uint8_t>(action),
+            targetSelectId);
+        sendMessageOnLinkThreadSafe(link.get(), message);
+    }
 }
 
 void Vehicle::clearAllParamMapRC(void)
