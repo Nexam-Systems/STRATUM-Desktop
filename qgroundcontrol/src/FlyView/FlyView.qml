@@ -55,6 +55,11 @@ Item {
     property real   _widgetMargin:          ScreenTools.defaultFontPixelWidth * 0.75
     property var    _dropperState:          ({ selectedMode: null, selectedPayloadIdx: null, dropped: [false, false, false, false], loaded: [false, false, false, false] })
     property string _dropperStatusText:     qsTr("Dropper ready")
+    property bool   _dropperToolsOpen:      false
+    property bool   _dropperLoadUnlocked:   false
+    property bool   _dropperLoadVisible:    false
+    property bool   _dropperDropVisible:    false
+    property bool   _dropperCameraVisible:  false
 
     property real   _fullItemZorder:    0
     property real   _pipItemZorder:     QGroundControl.zOrderWidgets
@@ -77,6 +82,30 @@ Item {
         _dropperState.selectedMode = null
         _dropperState.selectedPayloadIdx = null
         _dropperStatusText = qsTr("Payload %1 dropped").arg(index + 1)
+    }
+
+    function _openDropperTools() {
+        _dropperToolsOpen = !_dropperToolsOpen
+        if (!_dropperToolsOpen) {
+            _dropperLoadVisible = false
+            _dropperDropVisible = false
+            _dropperCameraVisible = false
+        }
+    }
+
+    function _showDropperSection(section) {
+        _dropperLoadVisible = (section === "load")
+        _dropperDropVisible = (section === "drop")
+        _dropperCameraVisible = (section === "camera")
+    }
+
+    function _unlockDropperLoad() {
+        _dropperLoadUnlocked = true
+        _dropperStatusText = qsTr("Loading unlocked")
+    }
+
+    function _confirmUnloadAll() {
+        unloadConfirmDialog.open()
     }
 
     function _dropperSendBurst() {
@@ -115,6 +144,7 @@ Item {
         _dropperState.dropped = [false, false, false, false]
         _dropperState.selectedMode = null
         _dropperState.selectedPayloadIdx = null
+        _dropperLoadUnlocked = false
         _dropperStatusText = qsTr("All payload gates opened")
     }
 
@@ -246,20 +276,45 @@ Item {
 
         QGCPalette { id: qgcPal }
 
+        MessageDialog {
+            id: unloadConfirmDialog
+            title: qsTr("Unload all payload gates?")
+            text: qsTr("This will open all gates and clear the current dropper state. Continue?")
+            buttons: MessageDialog.Yes | MessageDialog.No
+            onAccepted: _dropperUnloadAll()
+        }
+
         Item {
-            id: dropperControlPanel
+            id: dropperToolButtonHost
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.topMargin: toolbar.height + _toolsMargin
             anchors.leftMargin: _toolsMargin
+            width: dropperToolButton.width + _toolsMargin * 2
+            height: dropperToolButton.height + _toolsMargin * 2
+            visible: _activeVehicle && !QGroundControl.videoManager.fullScreen && !_is3DMode
+            z: QGroundControl.zOrderTopMost
+
+            QGCButton {
+                id: dropperToolButton
+                anchors.centerIn: parent
+                text: _dropperToolsOpen ? qsTr("Hide Dropper") : qsTr("Dropper")
+                onClicked: _openDropperTools()
+            }
+        }
+
+        Item {
+            id: dropperControlPanel
+            anchors.left: dropperToolButtonHost.right
+            anchors.top: dropperToolButtonHost.top
             width: ScreenTools.defaultFontPixelWidth * 24
             height: ScreenTools.defaultFontPixelWidth * 24
-            visible: _activeVehicle && !QGroundControl.videoManager.fullScreen && !_is3DMode
+            visible: _activeVehicle && _dropperToolsOpen && !QGroundControl.videoManager.fullScreen && !_is3DMode
             z: QGroundControl.zOrderTopMost
 
             Rectangle {
                 anchors.fill: parent
-                color: Qt.rgba(0, 0, 0, 0.72)
+                color: Qt.rgba(0, 0, 0, 0.78)
                 radius: ScreenTools.defaultBorderRadius
                 border.color: "#4ADE80"
                 border.width: 1
@@ -271,7 +326,7 @@ Item {
                 spacing: ScreenTools.defaultFontPixelWidth * 0.4
 
                 QGCLabel {
-                    text: qsTr("Dropper UAV")
+                    text: qsTr("Dropper Tools")
                     font.bold: true
                     color: "white"
                 }
@@ -287,100 +342,135 @@ Item {
                     spacing: ScreenTools.defaultFontPixelWidth * 0.4
 
                     QGCButton {
-                        text: qsTr("Unload All")
-                        onClicked: _dropperUnloadAll()
-                        enabled: _activeVehicle
+                        text: qsTr("Load")
+                        onClicked: {
+                            _showDropperSection("load")
+                        }
                     }
 
                     QGCButton {
-                        text: qsTr("Burst")
-                        onClicked: _dropperSendBurst()
-                        enabled: _activeVehicle
+                        text: qsTr("Drop")
+                        onClicked: {
+                            _showDropperSection("drop")
+                        }
                     }
-                }
 
-                QGCLabel {
-                    text: qsTr("Drop payloads")
-                    color: "white"
-                }
-
-                Row {
-                    spacing: ScreenTools.defaultFontPixelWidth * 0.4
-
-                    Repeater {
-                        model: 4
-                        delegate: QGCButton {
-                            text: qsTr("PLD %1").arg(index + 1)
-                            onClicked: _dropperSendSingle(index)
-                            enabled: _activeVehicle && !_dropperState.dropped[index]
+                    QGCButton {
+                        text: qsTr("Camera")
+                        onClicked: {
+                            _showDropperSection("camera")
                         }
                     }
                 }
 
-                QGCLabel {
-                    text: qsTr("Load payloads")
-                    color: "white"
-                }
+                Item {
+                    width: parent.width
+                    height: ScreenTools.defaultFontPixelWidth * 8
+                    visible: _dropperLoadVisible
 
-                Row {
-                    spacing: ScreenTools.defaultFontPixelWidth * 0.4
+                    Column {
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.35
 
-                    Repeater {
-                        model: 4
-                        delegate: QGCButton {
-                            text: _dropperState.loaded[index] ? qsTr("Loaded %1").arg(index + 1) : qsTr("Load %1").arg(index + 1)
-                            onClicked: _dropperLoadPayload(index)
-                            enabled: _activeVehicle && _dropperCanLoad(index) && !_dropperState.loaded[index]
+                        QGCButton {
+                            text: _dropperLoadUnlocked ? qsTr("Loading unlocked") : qsTr("Unlock load")
+                            enabled: !_dropperLoadUnlocked
+                            onClicked: _unlockDropperLoad()
+                        }
+
+                        QGCButton {
+                            text: qsTr("Unload All")
+                            enabled: _activeVehicle
+                            onClicked: _confirmUnloadAll()
+                        }
+
+                        Row {
+                            spacing: ScreenTools.defaultFontPixelWidth * 0.4
+
+                            Repeater {
+                                model: 4
+                                delegate: QGCButton {
+                                    text: _dropperState.loaded[index] ? qsTr("Loaded %1").arg(index + 1) : qsTr("Load %1").arg(index + 1)
+                                    onClicked: _dropperLoadPayload(index)
+                                    enabled: _activeVehicle && _dropperLoadUnlocked && _dropperCanLoad(index) && !_dropperState.loaded[index]
+                                }
+                            }
                         }
                     }
                 }
 
-                QGCLabel {
-                    text: qsTr("Camera")
-                    color: "white"
+                Item {
+                    width: parent.width
+                    height: ScreenTools.defaultFontPixelWidth * 8
+                    visible: _dropperDropVisible
+
+                    Column {
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.35
+
+                        QGCButton {
+                            text: qsTr("Burst")
+                            onClicked: _dropperSendBurst()
+                        }
+
+                        Row {
+                            spacing: ScreenTools.defaultFontPixelWidth * 0.4
+
+                            Repeater {
+                                model: 4
+                                delegate: QGCButton {
+                                    text: qsTr("PLD %1").arg(index + 1)
+                                    onClicked: _dropperSendSingle(index)
+                                    enabled: _activeVehicle && !_dropperState.dropped[index]
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Row {
-                    spacing: ScreenTools.defaultFontPixelWidth * 0.4
+                Item {
+                    width: parent.width
+                    height: ScreenTools.defaultFontPixelWidth * 8
+                    visible: _dropperCameraVisible
 
-                    QGCButton {
-                        text: qsTr("Center")
-                        onClicked: _dropperSendCameraAction("center")
-                        enabled: _activeVehicle
-                    }
+                    Column {
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.35
 
-                    QGCButton {
-                        text: qsTr("Capture")
-                        onClicked: _dropperSendCameraAction("capture")
-                        enabled: _activeVehicle
-                    }
+                        Row {
+                            spacing: ScreenTools.defaultFontPixelWidth * 0.4
 
-                    QGCButton {
-                        text: qsTr("Track")
-                        onClicked: _dropperSendCameraAction("track-center")
-                        enabled: _activeVehicle
-                    }
-                }
+                            QGCButton {
+                                text: qsTr("Center")
+                                onClicked: _dropperSendCameraAction("center")
+                            }
 
-                Row {
-                    spacing: ScreenTools.defaultFontPixelWidth * 0.4
+                            QGCButton {
+                                text: qsTr("Capture")
+                                onClicked: _dropperSendCameraAction("capture")
+                            }
 
-                    QGCButton {
-                        text: qsTr("Zoom +")
-                        onClicked: _dropperSendCameraAction("zoom-in")
-                        enabled: _activeVehicle
-                    }
+                            QGCButton {
+                                text: qsTr("Track")
+                                onClicked: _dropperSendCameraAction("track-center")
+                            }
+                        }
 
-                    QGCButton {
-                        text: qsTr("Zoom -")
-                        onClicked: _dropperSendCameraAction("zoom-out")
-                        enabled: _activeVehicle
-                    }
+                        Row {
+                            spacing: ScreenTools.defaultFontPixelWidth * 0.4
 
-                    QGCButton {
-                        text: qsTr("Rec")
-                        onClicked: _dropperSendCameraAction("rec-start")
-                        enabled: _activeVehicle
+                            QGCButton {
+                                text: qsTr("Zoom +")
+                                onClicked: _dropperSendCameraAction("zoom-in")
+                            }
+
+                            QGCButton {
+                                text: qsTr("Zoom -")
+                                onClicked: _dropperSendCameraAction("zoom-out")
+                            }
+
+                            QGCButton {
+                                text: qsTr("Rec")
+                                onClicked: _dropperSendCameraAction("rec-start")
+                            }
+                        }
                     }
                 }
             }
