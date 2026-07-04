@@ -100,6 +100,10 @@ Item {
     TrackerRoiOverlay {
         id:                      trackerRoiOverlay
         anchors.fill:            parent
+        // STRATUM: sit above flyViewVideoMouseArea (below) so the +/- ROI buttons receive
+        // clicks; the overlay's transparent areas still pass mouse events through to the
+        // designation MouseArea (a plain Item does not grab events).
+        z:                       20
         vehicle:                 QGroundControl.multiVehicleManager.activeVehicle
         videoWidth:              videoStreaming.getWidth()
         videoHeight:             videoStreaming.getHeight()

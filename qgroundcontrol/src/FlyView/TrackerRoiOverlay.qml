@@ -28,10 +28,20 @@ Item {
     readonly property real _roiCenterX: 0.5
     readonly property real _roiCenterY: 0.5
 
-    readonly property bool _enabled: !!vehicle && videoWidth > 0 && videoHeight > 0
+    // Effective video dimensions. videoWidth/videoHeight come from the streaming widget
+    // (letterbox-correct), but they can read 0 before the stream is sized -- and that
+    // binding would then latch this overlay invisible forever. Fall back to this overlay's
+    // own (anchors.fill) size, which is always valid once laid out, so the ROI affordance
+    // always appears once a vehicle is connected.
+    readonly property real _vw: videoWidth  > 0 ? videoWidth  : rootItem.width
+    readonly property real _vh: videoHeight > 0 ? videoHeight : rootItem.height
 
-    readonly property real _marginH: (rootItem.width - videoWidth) / 2
-    readonly property real _marginV: (rootItem.height - videoHeight) / 2
+    // Show the ROI control whenever a vehicle is connected (independent of stream size),
+    // so the operator can scope the search region before enabling tracking.
+    readonly property bool _enabled: !!vehicle && _vw > 0 && _vh > 0
+
+    readonly property real _marginH: (rootItem.width  - _vw) / 2
+    readonly property real _marginV: (rootItem.height - _vh) / 2
 
     // Clamp the diagonal fraction to a sane operable range.
     readonly property real _minRoi: 0.1
@@ -41,8 +51,8 @@ Item {
     // Same-aspect ROI: a box similar to the frame has fractional side length equal to
     // fractional diagonal length, so roi_w = roiSize * videoWidth, roi_h = roiSize *
     // videoHeight. This matches the companion's _roi_pixel_rect math exactly.
-    readonly property real _roiPixW: roiSize * videoWidth
-    readonly property real _roiPixH: roiSize * videoHeight
+    readonly property real _roiPixW: roiSize * _vw
+    readonly property real _roiPixH: roiSize * _vh
 
     function _clampRoi(v) { return Math.max(_minRoi, Math.min(_maxRoi, v)) }
 
@@ -64,8 +74,8 @@ Item {
 
         width:  rootItem._roiPixW
         height: rootItem._roiPixH
-        x: rootItem._marginH + (rootItem.videoWidth  - width)  / 2
-        y: rootItem._marginV + (rootItem.videoHeight - height) / 2
+        x: rootItem._marginH + (rootItem._vw - width)  / 2
+        y: rootItem._marginV + (rootItem._vh - height) / 2
 
         // Dashed feel via a subtle inner tint so the box reads as a scope, not a target.
         Rectangle {
