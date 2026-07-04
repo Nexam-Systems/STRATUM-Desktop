@@ -72,6 +72,7 @@ qt_add_qml_module(FlyViewModule
         OnScreenCameraTrackingController.qml
         OnScreenGimbalController.qml
         TargetTrackingOverlay.qml
+        TrackerRoiOverlay.qml
         PreFlightBatteryCheck.qml
         PreFlightCheckList.qml
         PreFlightCheckListShowAction.qml
@@ -87,6 +88,7 @@ qt_add_qml_module(FlyViewModule
         SubChecklist.qml
         TelemetryValuesBar.qml
         TerrainProgress.qml
+        TrackingToggleAction.qml
         VehicleWarnings.qml
         VirtualJoystick.qml
         VTOLChecklist.qml

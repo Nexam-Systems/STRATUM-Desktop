@@ -13,12 +13,18 @@ ToolStripActionList {
     signal defineAOP      // retained: emitters relocated to the ribbon (FlyViewToolBar)
     signal setStandoff    // retained: emitters relocated to the ribbon (FlyViewToolBar)
 
-    // STRATUM: the command strip now carries ONLY the six flight-mode commands pulled
-    // from the mode menu -- Standoff / Land / Hold / Abort / Engagement / Vision
-    // Engagement -- each a hold-to-confirm button that switches FLIGHT MODE directly
-    // (the mode menu's working path). Define AOP and Set Standoff were relocated to the
-    // centre of the top ribbon; Takeoff and Safe Recovery were removed from the strip.
+    // STRATUM: the command strip carries the flight-mode commands pulled from the mode
+    // menu -- Standoff / Land / Hold / Abort / Engagement / Vision Engagement -- each a
+    // hold-to-confirm button that switches FLIGHT MODE directly (the mode menu's working
+    // path). Define AOP and Set Standoff were relocated to the centre of the top ribbon.
+    //
+    // STRATUM: Takeoff is restored here as a guided ACTION (not a flight-mode select):
+    // it opens the altitude dialog and issues MAV_CMD_NAV_TAKEOFF via guidedModeTakeoff()
+    // (see GuidedActionTakeoff.qml -> showTakeoffDialog(), executed in
+    // GuidedActionsController.executeAction). It is grouped with Land, matching QGC's
+    // takeoff/land grouping convention. A Tracking on/off toggle is appended at the end.
     model: [
+        GuidedActionTakeoff { },            // STRATUM: MAV_CMD_NAV_TAKEOFF guided action (altitude dialog)
         GuidedActionStandoffMode { },       // Standoff flight mode (hold-to-confirm)
         GuidedActionLand { },               // Land flight mode
         GuidedActionHold { },               // Hold flight mode
@@ -44,6 +50,9 @@ ToolStripActionList {
                     QGroundControl.multiVehicleManager.activeVehicle.flightMode = qsTr("Vision Engagement")
                 }
             }
-        }
+        },
+        // STRATUM: Tracking on/off toggle -- enables/disables the already-running
+        // companion tracker via Vehicle.setTrackerEnabled(bool) (NEXAM_TRACKER_CONFIG 42005).
+        TrackingToggleAction { }
     ]
 }

@@ -404,6 +404,19 @@ public:
     /// Called from the FlyView video overlay when the operator clicks or drags a box.
     Q_INVOKABLE void sendTargetSelect(double topLeftX, double topLeftY, double botRightX, double botRightY, int action = 1);
 
+    /// STRATUM: enable/disable the companion visual tracker. Updates the stored tracker
+    /// config and packs+sends a full NEXAM_TRACKER_CONFIG (42005) to the companion.
+    /// Called by the FlyView tracking on/off button. This enables/disables an already-
+    /// running tracker node; it does not spawn a process.
+    Q_INVOKABLE void setTrackerEnabled(bool on);
+
+    /// STRATUM: set the tracker ROI (region the tracker searches within). centerX/centerY
+    /// are normalized 0..1 (fixed at 0.5 for now, D5); sizeDiag is the ROI diagonal as a
+    /// fraction of the full-frame diagonal. Updates the stored tracker config and packs+
+    /// sends a full NEXAM_TRACKER_CONFIG (42005) to the companion. Called by the FlyView
+    /// PiP ROI overlay.
+    Q_INVOKABLE void setTrackerRoi(float centerX, float centerY, float sizeDiag);
+
     /// Clears all PARAM_MAP_RC settings from vehicle
     Q_INVOKABLE void clearAllParamMapRC(void);
 
@@ -915,6 +928,8 @@ private:
     void _flightTimerStart              ();
     void _flightTimerStop               ();
     void _setMessageInterval            (int messageId, int rate);
+    // STRATUM: pack + broadcast a full NEXAM_TRACKER_CONFIG (42005) from current state.
+    void _sendTrackerConfig             ();
     bool setFlightModeCustom            (const QString& flightMode, uint8_t* base_mode, uint32_t* custom_mode);
     QString _formatMavCommand           (MAV_CMD command, float param1);
 
@@ -1083,6 +1098,14 @@ public:
     // these flags are used to determine if the speed change action from fly view should be shown
     bool _multirotor_speed_limits_available = false;
     bool _fixed_wing_airspeed_limits_available = false;
+
+    // STRATUM: current companion tracker config, packed into NEXAM_TRACKER_CONFIG (42005)
+    // by setTrackerEnabled()/setTrackerRoi(). Each invokable updates one field and sends
+    // a full config, so these members are the single source of truth for the whole msg.
+    bool  _trackerEnabled = false;
+    float _roiCenterX     = 0.5f;
+    float _roiCenterY     = 0.5f;
+    float _roiSize        = 0.5f;   // ROI diagonal as a fraction of the full-frame diagonal
 
     // FactGroup facts
 

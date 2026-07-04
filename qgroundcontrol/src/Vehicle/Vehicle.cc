@@ -3049,6 +3049,81 @@ void Vehicle::sendTargetSelect(double topLeftX, double topLeftY, double botRight
     }
 }
 
+void Vehicle::setTrackerEnabled(bool on)
+{
+    // STRATUM: on/off toggle for the companion visual tracker. Update the stored state
+    // and re-send the full NEXAM_TRACKER_CONFIG so enable + current ROI travel together.
+    _trackerEnabled = on;
+    _sendTrackerConfig();
+}
+
+void Vehicle::setTrackerRoi(float centerX, float centerY, float sizeDiag)
+{
+    // STRATUM: ROI-scoping from the PiP overlay. Update the stored ROI and re-send the
+    // full config so the ROI + current enable state travel together.
+    const auto clamp01f = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
+    _roiCenterX = clamp01f(centerX);
+    _roiCenterY = clamp01f(centerY);
+    _roiSize    = clamp01f(sizeDiag);
+    _sendTrackerConfig();
+}
+
+void Vehicle::_sendTrackerConfig()
+{
+    // STRATUM: pack a FULL NEXAM_TRACKER_CONFIG (42005) from the combined current tracker
+    // state and broadcast it to the companion, mirroring sendTargetSelect's channel /
+    // broadcast / target-addressing (target_system = vehicle sysid, target_component =
+    // MAV_COMP_ID_ONBOARD_COMPUTER). Every invokable that changes one field sends the
+    // whole message, so a dropped frame never leaves enable and ROI out of sync.
+    //
+    // NOTE: mavlink_msg_nexam_tracker_config_pack_chan (and the message id) do not exist
+    // until STRATUM's mavlink C headers are regenerated from stratum.xml with the 42005
+    // block added (see stratum_tracker/ROI_REGEN_NOTE.md). This will not compile until
+    // that regeneration is done.
+    QList<SharedLinkInterfacePtr> vehicleLinks;
+    const QList<SharedLinkInterfacePtr> allLinks = LinkManager::instance()->links();
+    for (const SharedLinkInterfacePtr &link : allLinks) {
+        if (link && vehicleLinkManager()->containsLink(link.get())) {
+            vehicleLinks.append(link);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        // Fall back to the primary link if the filter came up empty.
+        SharedLinkInterfacePtr primary = vehicleLinkManager()->primaryLink().lock();
+        if (primary) {
+            vehicleLinks.append(primary);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        qCDebug(VehicleLog) << "sendTrackerConfig: no links!";
+        return;
+    }
+
+    // Monotonic config id so the companion can distinguish successive configs.
+    static uint8_t trackerConfigId = 0;
+    trackerConfigId++;
+
+    for (const SharedLinkInterfacePtr &link : vehicleLinks) {
+        if (!link) {
+            continue;
+        }
+        mavlink_message_t message;
+        mavlink_msg_nexam_tracker_config_pack_chan(
+            static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+            static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+            link->mavlinkChannel(),
+            &message,
+            _roiCenterX,
+            _roiCenterY,
+            _roiSize,
+            static_cast<uint8_t>(_systemID),                    // target_system: companion shares the vehicle sysid
+            static_cast<uint8_t>(MAV_COMP_ID_ONBOARD_COMPUTER), // target_component: companion tracker
+            static_cast<uint8_t>(_trackerEnabled ? 1 : 0),
+            trackerConfigId);
+        sendMessageOnLinkThreadSafe(link.get(), message);
+    }
+}
+
 void Vehicle::clearAllParamMapRC(void)
 {
     SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();

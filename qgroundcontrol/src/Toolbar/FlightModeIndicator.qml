@@ -23,6 +23,16 @@ Item {
     property bool _vtolInFWDFlight: activeVehicle ? activeVehicle.vtolInFwdFlight : false
     property var  _vehicleInAir:    activeVehicle ? activeVehicle.flying || activeVehicle.landing : false
 
+    // STRATUM: "TRACKING Active" ribbon cue. Derived state -- bound to the inbound
+    // NEXAM_TARGET_TRACK (42004) fact group on Vehicle. status.value === 1 is
+    // StatusTracking (see VehicleTargetTrackFactGroup.h). The fact group's 300 ms
+    // staleness timeout clears status on stream loss, so this self-extinguishes without
+    // extra logic. Guarded for a null vehicle and for the fact group being absent,
+    // mirroring VisionEngagementStatus.qml's _hasGroup pattern.
+    property var  _targetTrack:     activeVehicle ? activeVehicle.targetTrack : null
+    property bool _hasTrackGroup:   !!_targetTrack
+    property bool _tracking:        _hasTrackGroup ? (_targetTrack.status.value === 1) : false
+
     QGCPalette { id: qgcPal }
 
     RowLayout {
@@ -56,6 +66,31 @@ Item {
             font.pointSize:         ScreenTools.smallFontPointSize
             wrapMode:               Text.WordWrap
             visible:                _isVTOL
+        }
+
+        // STRATUM: "TRACKING Active" pill, shown only while the companion tracker reports
+        // StatusTracking (targetTrack.status === 1). Uses the ribbon text colour for the
+        // outline/label so it reads correctly on the coloured fly-view ribbon.
+        Rectangle {
+            id:                     trackingIndicator
+            Layout.alignment:       Qt.AlignVCenter
+            Layout.leftMargin:      ScreenTools.defaultFontPixelWidth
+            implicitWidth:          trackingLabel.implicitWidth + ScreenTools.defaultFontPixelWidth * 1.5
+            implicitHeight:         trackingLabel.implicitHeight + ScreenTools.defaultFontPixelHeight * 0.35
+            radius:                 height / 2
+            color:                  "transparent"
+            border.color:           ribbonTextColor
+            border.width:           1
+            visible:                _tracking
+
+            QGCLabel {
+                id:                 trackingLabel
+                anchors.centerIn:   parent
+                text:               qsTr("TRACKING Active")
+                color:              ribbonTextColor
+                font.bold:          true
+                font.pointSize:     ScreenTools.smallFontPointSize
+            }
         }
     }
 
