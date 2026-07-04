@@ -10,7 +10,7 @@ ToolStripAction {
     id: action
 
     text: qsTr("Dropper")
-    iconSource: "qrc:/qmlimages/Gripper.svg"
+    iconSource: "qrc:/res/DropArrow.svg"
     enabled: !!QGroundControl.multiVehicleManager.activeVehicle
     visible: true
 

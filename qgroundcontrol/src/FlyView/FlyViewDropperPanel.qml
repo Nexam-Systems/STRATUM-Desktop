@@ -11,7 +11,7 @@ Rectangle {
 
     property var dropperAction
 
-    implicitWidth: ScreenTools.defaultFontPixelWidth * 24
+    width: ScreenTools.defaultFontPixelWidth * 30
     implicitHeight: contentColumn.implicitHeight + (ScreenTools.defaultFontPixelWidth * 1.5)
     color: Qt.rgba(0, 0, 0, 0.86)
     radius: ScreenTools.defaultBorderRadius
@@ -164,6 +164,36 @@ Rectangle {
                     QGCButton {
                         text: qsTr("Track")
                         onClicked: dropperAction ? dropperAction._dropperSendCameraAction("track-center") : undefined
+                    }
+                }
+
+                Flow {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.35
+                    Layout.fillWidth: true
+
+                    QGCButton {
+                        text: qsTr("Pan Up")
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("pan-up") : undefined
+                    }
+
+                    QGCButton {
+                        text: qsTr("Pan Down")
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("pan-down") : undefined
+                    }
+
+                    QGCButton {
+                        text: qsTr("Tilt Left")
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("tilt-left") : undefined
+                    }
+
+                    QGCButton {
+                        text: qsTr("Tilt Right")
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("tilt-right") : undefined
+                    }
+
+                    QGCButton {
+                        text: qsTr("Stop")
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("stop") : undefined
                     }
                 }
 

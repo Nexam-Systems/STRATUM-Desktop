@@ -98,6 +98,7 @@ qt_add_resources(FlyViewModule flyview_resources
     PREFIX "/res"
     BASE "${CMAKE_SOURCE_DIR}/resources"
     FILES
+        "${CMAKE_SOURCE_DIR}/resources/DropArrow.svg"
         "${CMAKE_SOURCE_DIR}/resources/Gripper.svg"
         "${CMAKE_SOURCE_DIR}/resources/land.svg"
         "${CMAKE_SOURCE_DIR}/resources/NoVideoBackground.jpg"
