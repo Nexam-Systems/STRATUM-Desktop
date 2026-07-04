@@ -147,73 +147,96 @@ Rectangle {
                 anchors.right: parent.right
                 spacing: ScreenTools.defaultFontPixelWidth * 0.35
 
+                GridLayout {
+                    columns: 3
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.35
+                    Layout.fillWidth: true
+
+                    Item { Layout.preferredWidth: parent.width / 3 }
+
+                    QGCButton {
+                        text: qsTr("↑")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("pan-up") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+
+                    Item { Layout.preferredWidth: parent.width / 3 }
+
+                    QGCButton {
+                        text: qsTr("←")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("tilt-left") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+
+                    QGCButton {
+                        text: qsTr("■")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("stop") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+
+                    QGCButton {
+                        text: qsTr("→")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("tilt-right") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+
+                    Item { Layout.preferredWidth: parent.width / 3 }
+
+                    QGCButton {
+                        text: qsTr("↓")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("pan-down") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+
+                    Item { Layout.preferredWidth: parent.width / 3 }
+                }
+
+                RowLayout {
+                    spacing: ScreenTools.defaultFontPixelWidth * 0.35
+                    Layout.fillWidth: true
+
+                    Item { Layout.preferredWidth: parent.width / 3 }
+
+                    QGCButton {
+                        text: qsTr("-")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("zoom-out") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+
+                    QGCButton {
+                        text: qsTr("+")
+                        font.pointSize: ScreenTools.defaultFontPointSize * 1.5
+                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("zoom-in") : undefined
+                        Layout.preferredWidth: parent.width / 3
+                    }
+                }
+
                 RowLayout {
                     spacing: ScreenTools.defaultFontPixelWidth * 0.35
                     Layout.fillWidth: true
 
                     QGCButton {
-                        text: qsTr("Center")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("center") : undefined
-                    }
-
-                    QGCButton {
                         text: qsTr("Capture")
                         onClicked: dropperAction ? dropperAction._dropperSendCameraAction("capture") : undefined
+                        Layout.preferredWidth: parent.width / 3
                     }
 
                     QGCButton {
                         text: qsTr("Track")
                         onClicked: dropperAction ? dropperAction._dropperSendCameraAction("track-center") : undefined
-                    }
-                }
-
-                Flow {
-                    spacing: ScreenTools.defaultFontPixelWidth * 0.35
-                    Layout.fillWidth: true
-
-                    QGCButton {
-                        text: qsTr("Pan Up")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("pan-up") : undefined
-                    }
-
-                    QGCButton {
-                        text: qsTr("Pan Down")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("pan-down") : undefined
-                    }
-
-                    QGCButton {
-                        text: qsTr("Tilt Left")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("tilt-left") : undefined
-                    }
-
-                    QGCButton {
-                        text: qsTr("Tilt Right")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("tilt-right") : undefined
-                    }
-
-                    QGCButton {
-                        text: qsTr("Stop")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("stop") : undefined
-                    }
-                }
-
-                RowLayout {
-                    spacing: ScreenTools.defaultFontPixelWidth * 0.35
-                    Layout.fillWidth: true
-
-                    QGCButton {
-                        text: qsTr("Zoom +")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("zoom-in") : undefined
-                    }
-
-                    QGCButton {
-                        text: qsTr("Zoom -")
-                        onClicked: dropperAction ? dropperAction._dropperSendCameraAction("zoom-out") : undefined
+                        Layout.preferredWidth: parent.width / 3
                     }
 
                     QGCButton {
                         text: qsTr("Rec")
                         onClicked: dropperAction ? dropperAction._dropperSendCameraAction("rec-start") : undefined
+                        Layout.preferredWidth: parent.width / 3
                     }
                 }
 
@@ -224,16 +247,19 @@ Rectangle {
                     QGCButton {
                         text: qsTr("TV")
                         onClicked: dropperAction ? dropperAction._dropperSelectFeed("TV") : undefined
+                        Layout.preferredWidth: parent.width / 3
                     }
 
                     QGCButton {
                         text: qsTr("IR")
                         onClicked: dropperAction ? dropperAction._dropperSelectFeed("IR") : undefined
+                        Layout.preferredWidth: parent.width / 3
                     }
 
                     QGCButton {
                         text: dropperAction && dropperAction._dropperIrFeedActive ? qsTr("IR active") : qsTr("TV active")
                         enabled: false
+                        Layout.preferredWidth: parent.width / 3
                     }
                 }
             }
