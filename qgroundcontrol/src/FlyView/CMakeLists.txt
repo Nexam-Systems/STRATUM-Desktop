@@ -85,7 +85,6 @@ qt_add_qml_module(FlyViewModule
         ProximityRadarVideoView.qml
         RoverChecklist.qml
         StandoffController.qml
-        StandoffOrbitDialog.qml
         SubChecklist.qml
         TelemetryValuesBar.qml
         TerrainProgress.qml

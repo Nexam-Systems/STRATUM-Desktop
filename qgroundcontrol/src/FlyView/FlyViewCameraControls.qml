@@ -29,7 +29,11 @@ Item {
     // Emitted after every command so the host (dropper panel / overlay) can show feedback.
     signal statusMessage(string text)
 
-    property bool _feedIrActive: false
+    readonly property var _vs: QGroundControl.settingsManager.videoSettings
+    // Active feed is derived from which stored URL the live rtspUrl currently matches,
+    // so the dropper panel and the video overlay always show the same TV/IR state.
+    readonly property bool _feedIrActive: _vs.irRtspUrl.rawValue !== "" &&
+                                          _vs.rtspUrl.rawValue === _vs.irRtspUrl.rawValue
     property bool _recActive:    false
     property bool _trackActive:  false
 
@@ -37,9 +41,12 @@ Item {
     readonly property color _accentDim:  "#1FB97D"
     readonly property real  _btnHeight:  ScreenTools.defaultFontPixelHeight * (compact ? 1.9 : 2.3)
     readonly property real  _spacing:    ScreenTools.defaultFontPixelWidth * 0.4
+    // Inner padding — only in overlay mode (the bordered card over the video).
+    readonly property real  _pad:        overlayMode ? ScreenTools.defaultFontPixelWidth * 0.75 : 0
 
-    implicitWidth:  contentColumn.implicitWidth
-    implicitHeight: contentColumn.implicitHeight
+    // Include the padding so the content is never compressed / clipped by the border.
+    implicitWidth:  contentColumn.implicitWidth + (_pad * 2)
+    implicitHeight: contentColumn.implicitHeight + (_pad * 2)
 
     function _send(cameraAction) {
         const sent = QGroundControl.videoManager.sendCameraAction(cameraAction)
@@ -50,9 +57,19 @@ Item {
     }
 
     function _selectFeed(feed) {
-        _feedIrActive = (feed === "IR")
-        // Palette / feed switching is applied to the active video output.
-        root.statusMessage(_feedIrActive ? qsTr("IR feed selected") : qsTr("TV feed selected"))
+        const url = (feed === "IR") ? _vs.irRtspUrl.rawValue : _vs.tvRtspUrl.rawValue
+        if (!url) {
+            root.statusMessage(qsTr("No %1 URL set — configure it in Application Settings ▸ Video").arg(feed))
+            return
+        }
+        // Ensure the RTSP source is active, then point it at the chosen feed. Writing
+        // rtspUrl restarts the stream (VideoManager listens on its rawValueChanged), so
+        // the video swaps between the TV and IR URLs — matching the web UI TV/IR buttons.
+        if (_vs.videoSource.rawValue !== _vs.rtspVideoSource) {
+            _vs.videoSource.rawValue = _vs.rtspVideoSource
+        }
+        _vs.rtspUrl.rawValue = url
+        root.statusMessage(qsTr("%1 feed selected").arg(feed))
     }
 
     function _toggleRec() {
@@ -105,7 +122,7 @@ Item {
     ColumnLayout {
         id: contentColumn
         anchors.fill: parent
-        anchors.margins: root.overlayMode ? ScreenTools.defaultFontPixelWidth * 0.75 : 0
+        anchors.margins: root._pad
         spacing: root._spacing
 
         // ---- Feed select: TV / IR ------------------------------------------

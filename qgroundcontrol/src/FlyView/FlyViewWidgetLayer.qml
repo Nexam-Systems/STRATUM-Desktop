@@ -265,8 +265,8 @@ Item {
     // the map centre. The operator either types the target lat/lon or clicks the map
     // while the crosshair pick cursor is active (FlyViewMap._standoffPickMode) - both
     // paths fill the same fields, and the last writer wins. Commit goes through
-    // StandoffController.beginStandoff with the coordinate, so the geometry contract
-    // with PX4 (target + distance / bearing / relative height) is unchanged.
+    // StandoffController.beginStandoff, which sends the web-UI standoff contract
+    // (cmd 31010 params + 31011 activate) to the bridge companion computer.
     Rectangle {
         id:                 standoffPanel
         visible:            false
@@ -374,34 +374,45 @@ Item {
                 onTextChanged:         standoffPanel._updatePending()
             }
 
-            QGCLabel { text: qsTr("Standoff distance") }
+            // STRATUM: raw metres / km-h to match the web UI standoff contract exactly
+            // (the values are sent verbatim to the bridge in cmd 31010).
+            QGCLabel { text: qsTr("Distance") }
             QGCTextField {
                 id:                    standoffDistanceField
                 Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
-                text:                  "50"
-                unitsLabel:            QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
+                text:                  "300"
+                unitsLabel:            qsTr("m")
                 showUnits:             true
                 inputMethodHints:      Qt.ImhFormattedNumbersOnly
             }
 
-            QGCLabel { text: qsTr("Standoff height") }
+            QGCLabel { text: qsTr("Height AGL") }
             QGCTextField {
                 id:                    standoffHeightField
                 Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
+                text:                  "150"
+                unitsLabel:            qsTr("m")
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+            }
+
+            QGCLabel { text: qsTr("Speed") }
+            QGCTextField {
+                id:                    standoffSpeedField
+                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
                 text:                  "30"
-                unitsLabel:            QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
+                unitsLabel:            qsTr("km/h")
                 showUnits:             true
                 inputMethodHints:      Qt.ImhFormattedNumbersOnly
             }
 
             QGCLabel { text: qsTr("Direction") }
-            QGCTextField {
-                id:                    standoffDirectionField
+            QGCComboBox {
+                id:                    standoffDirectionCombo
                 Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
-                text:                  "0"
-                unitsLabel:            qsTr("deg (from N)")
-                showUnits:             true
-                inputMethodHints:      Qt.ImhFormattedNumbersOnly
+                currentIndex:          0
+                // Index maps directly to the web UI direction value (0=N,1=E,2=S,3=W).
+                model:                 [qsTr("North ↑"), qsTr("East →"), qsTr("South ↓"), qsTr("West ←")]
             }
 
             // STRATUM: the command needs a vehicle; surface that instead of failing
@@ -428,17 +439,16 @@ Item {
                     primary:    true
                     enabled:    standoffPanel._coordValid && _activeVehicle !== null
                     onClicked: {
-                        var distance = parseFloat(standoffDistanceField.text)
-                        var height   = parseFloat(standoffHeightField.text)
-                        var angle    = parseFloat(standoffDirectionField.text)
+                        var distance  = parseFloat(standoffDistanceField.text)
+                        var height    = parseFloat(standoffHeightField.text)
+                        var speed     = parseFloat(standoffSpeedField.text)
+                        var direction = standoffDirectionCombo.currentIndex   // 0=N,1=E,2=S,3=W
                         if (isNaN(distance) || distance <= 0) { distance = 0 }
-                        if (isNaN(height))                     { height   = 0 }
-                        if (isNaN(angle))                      { angle    = 0 }
-                        // Normalize bearing into [0, 360)
-                        angle = ((angle % 360) + 360) % 360
+                        if (isNaN(height))                    { height   = 0 }
+                        if (isNaN(speed)   || speed <= 0)     { speed    = 0 }
                         var target = QtPositioning.coordinate(parseFloat(standoffLatField.text),
                                                               parseFloat(standoffLonField.text))
-                        mapControl.standoffCmdController.beginStandoff(distance, height, angle, target)
+                        mapControl.standoffCmdController.beginStandoff(distance, height, speed, direction, target)
                         standoffPanel.close()
                     }
                 }

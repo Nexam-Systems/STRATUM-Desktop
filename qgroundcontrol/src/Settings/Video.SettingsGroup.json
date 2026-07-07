@@ -30,6 +30,24 @@
             "keywords": "rtsp,video url,stream url"
         },
         {
+            "name": "tvRtspUrl",
+            "shortDesc": "RTSP URL for the TV (visible-light) camera feed.",
+            "longDesc": "TV (visible light) RTSP url. Selected by the TV button in the camera controls. Example: rtsp://192.168.144.108:554/tv",
+            "type": "string",
+            "default": "",
+            "label": "TV RTSP URL",
+            "keywords": "rtsp,tv,visible,video url,stream url,feed"
+        },
+        {
+            "name": "irRtspUrl",
+            "shortDesc": "RTSP URL for the IR (infrared) camera feed.",
+            "longDesc": "IR (infrared) RTSP url. Selected by the IR button in the camera controls. Example: rtsp://192.168.144.108:554/ir",
+            "type": "string",
+            "default": "",
+            "label": "IR RTSP URL",
+            "keywords": "rtsp,ir,infrared,thermal,video url,stream url,feed"
+        },
+        {
             "name": "tcpUrl",
             "shortDesc": "Network address and port for TCP video stream (e.g. 192.168.143.200:3001).",
             "longDesc": "TCP url address and port to bind to for video stream. Example: 192.168.143.200:3001",

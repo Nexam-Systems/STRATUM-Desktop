@@ -791,8 +791,8 @@ FlightMap {
         }
     }
 
-    // STRATUM: standoff command controller. Drives the standoff dialog, flies the
-    // vehicle to the computed standoff point, and prompts to orbit on arrival.
+    // STRATUM: standoff command controller. Sends the orbit params + activate commands
+    // to the bridge (web UI contract) and owns the on-map surveillance circle state.
     StandoffController {
         id:                 standoffController
         guidedController:   globals.guidedControllerFlyView
