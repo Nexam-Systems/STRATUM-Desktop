@@ -32,6 +32,31 @@ ToolStripAction {
     property var _dropperState: ({ selectedMode: null, selectedPayloadIdx: null, dropped: [false, false, false, false], loaded: [false, false, false, false] })
     property string _dropperStatusText: qsTr("Dropper ready")
 
+    // STRATUM: minimum distance from the takeoff/home point before a payload may be
+    // dropped, matching the web UI safety check (drop is blocked within 100 m of takeoff).
+    readonly property real _minDropDistanceM: 100
+
+    // Returns { ok, reason }. Blocks the drop unless we can confirm the UAV is at least
+    // _minDropDistanceM from the takeoff (home) point — same gate as the web UI.
+    function _dropSafetyCheck() {
+        if (!_activeVehicle) {
+            return ({ ok: false, reason: qsTr("No vehicle connected.") })
+        }
+        const here = _activeVehicle.coordinate
+        const home = _activeVehicle.homePosition
+        if (!here.isValid) {
+            return ({ ok: false, reason: qsTr("No UAV position — cannot verify distance from takeoff.") })
+        }
+        if (!home.isValid) {
+            return ({ ok: false, reason: qsTr("No takeoff point yet — arm/takeoff first to set it.") })
+        }
+        const dist = here.distanceTo(home)
+        if (dist < _minDropDistanceM) {
+            return ({ ok: false, reason: qsTr("UAV is %1 m from takeoff — must be ≥ %2 m away to drop.").arg(Math.round(dist)).arg(_minDropDistanceM) })
+        }
+        return ({ ok: true, reason: "" })
+    }
+
     function _showDropperSection(section) {
         _dropperSection = section
     }
@@ -61,9 +86,16 @@ ToolStripAction {
         if (!_activeVehicle || !_dropperState.selectedMode) {
             return
         }
+        const safety = _dropSafetyCheck()
+        if (!safety.ok) {
+            _dropperStatusText = safety.reason
+            return
+        }
         if (_dropperState.selectedMode === "burst") {
             _activeVehicle.sendCommand(191, 31012, true, 10, 0, 0, 0, 0, 0, 0, 0)
             _dropperState.dropped = [true, true, true, true]
+            // A dropped bay is now empty (gate open) -> no longer loaded.
+            _dropperState.loaded = [false, false, false, false]
             _dropperStatusText = qsTr("⚡ BURST — all payloads deployed")
         } else {
             const index = _dropperState.selectedPayloadIdx
@@ -71,6 +103,7 @@ ToolStripAction {
             bits[index] = 1
             _activeVehicle.sendCommand(191, 31012, true, 5, bits[0], bits[1], bits[2], bits[3], 0, 0, 0)
             _dropperState.dropped[index] = true
+            _dropperState.loaded[index] = false
             _dropperStatusText = qsTr("⚡ PLD %1 deployed").arg(index + 1)
         }
         _dropperState.selectedMode = null
@@ -78,30 +111,32 @@ ToolStripAction {
         _dropperState = Object.assign({}, _dropperState)
     }
 
-    // ---- LOAD: open-all-gates + sequential load (matches doUnloadAll / doLoadPayload) ----
-    function _dropperCanLoad(index) {
-        if (index === 0) {
-            return true
+    // ---- LOAD: each bay loads / unloads INDEPENDENTLY ----------------------------
+    // Servo command 31012 mode 5 carries the full 4-servo state, so every load/unload
+    // sends the complete desired pattern: a loaded bay is closed (bit 0), an empty bay
+    // is open (bit 1). Tracking loaded[] and sending the whole pattern each time lets us
+    // re-seat a single bay (e.g. PLD 3) without disturbing the others.
+    function _dropperApplyServos() {
+        const bits = [0, 0, 0, 0]
+        for (let i = 0; i < 4; i++) {
+            bits[i] = _dropperState.loaded[i] ? 0 : 1
         }
-        return _dropperState.loaded[index - 1]
+        _activeVehicle.sendCommand(191, 31012, true, 5, bits[0], bits[1], bits[2], bits[3], 0, 0, 0)
     }
 
-    function _dropperLoadPayload(index) {
+    function _dropperToggleLoad(index) {
         if (!_activeVehicle) {
             return
         }
-        // Close servos 1..index (hold payload), keep index+1..4 open to receive more.
-        const bits = [0, 0, 0, 0]
-        for (let i = index + 1; i < 4; i++) {
-            bits[i] = 1
+        const willLoad = !_dropperState.loaded[index]
+        _dropperState.loaded[index] = willLoad
+        if (willLoad) {
+            _dropperState.dropped[index] = false
         }
-        _activeVehicle.sendCommand(191, 31012, true, 5, bits[0], bits[1], bits[2], bits[3], 0, 0, 0)
-        for (let i = 0; i <= index; i++) {
-            _dropperState.loaded[i] = true
-            _dropperState.dropped[i] = false
-        }
+        _dropperApplyServos()
         _dropperState = Object.assign({}, _dropperState)
-        _dropperStatusText = qsTr("✓ PLD %1 loaded").arg(index + 1)
+        _dropperStatusText = willLoad ? qsTr("✓ PLD %1 loaded").arg(index + 1)
+                                      : qsTr("PLD %1 unloaded — gate open").arg(index + 1)
     }
 
     function _dropperUnloadAll() {
@@ -114,7 +149,7 @@ ToolStripAction {
         _dropperState.selectedMode = null
         _dropperState.selectedPayloadIdx = null
         _dropperState = Object.assign({}, _dropperState)
-        _dropperStatusText = qsTr("✓ All gates opened — load payloads sequentially")
+        _dropperStatusText = qsTr("✓ All gates opened")
     }
 
     dropPanelComponent: Component {

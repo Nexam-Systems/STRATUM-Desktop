@@ -144,14 +144,14 @@ Rectangle {
             }
         }
 
-        // ==== LOAD: open all gates, then load sequentially ===================
+        // ==== LOAD: each bay loads / unloads independently ===================
         ColumnLayout {
             visible: dropperAction && dropperAction._dropperSection === "load"
             Layout.fillWidth: true
             spacing: ScreenTools.defaultFontPixelWidth * 0.4
 
             QGCLabel {
-                text: qsTr("Open gates, insert payloads, then load in sequence (1 → 4).")
+                text: qsTr("Tap a bay to load it (close gate); tap again to unload (open gate). Bays are independent.")
                 color: panel._accentDim
                 font.pointSize: ScreenTools.smallFontPointSize
                 wrapMode: Text.WordWrap
@@ -177,10 +177,10 @@ Rectangle {
                         required property int index
                         readonly property bool _loaded: panel._state.loaded[index]
                         Layout.fillWidth: true
-                        text: _loaded ? qsTr("✓ PLD %1 LOADED").arg(index + 1) : qsTr("▼ LOAD PLD %1").arg(index + 1)
+                        text: _loaded ? qsTr("✓ PLD %1 (unload)").arg(index + 1) : qsTr("▼ Load PLD %1").arg(index + 1)
                         primary: _loaded
-                        enabled: dropperAction && !!dropperAction._activeVehicle && dropperAction._dropperCanLoad(index) && !_loaded
-                        onClicked: dropperAction ? dropperAction._dropperLoadPayload(index) : undefined
+                        enabled: dropperAction && !!dropperAction._activeVehicle
+                        onClicked: dropperAction ? dropperAction._dropperToggleLoad(index) : undefined
                     }
                 }
             }
@@ -192,9 +192,9 @@ Rectangle {
                 font.pointSize: ScreenTools.smallFontPointSize
                 text: {
                     var n = panel._state.loaded.filter(function (l) { return l }).length
-                    if (n === 4) return qsTr("✓ ALL 4 PAYLOADS LOADED — READY")
-                    if (n > 0)   return qsTr("%1 loaded · load PLD %2 next").arg(n).arg(n + 1)
-                    return ""
+                    if (n === 4) return qsTr("✓ ALL 4 BAYS LOADED")
+                    if (n > 0)   return qsTr("%1 of 4 bays loaded").arg(n)
+                    return qsTr("All gates open")
                 }
             }
         }
