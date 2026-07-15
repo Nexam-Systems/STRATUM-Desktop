@@ -57,8 +57,6 @@ qt_add_qml_module(FlyViewModule
         GuidedActionChangeAltitude.qml
         GuidedActionChangeSpeed.qml
         GuidedActionConfirm.qml
-        GuidedActionHold.qml
-        GuidedActionLand.qml
         GuidedActionPause.qml
         GuidedActionRTL.qml
         GuidedActionsController.qml

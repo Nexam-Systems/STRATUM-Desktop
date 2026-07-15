@@ -289,6 +289,9 @@ Item {
             return !isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
         }
 
+        // STRATUM: set when the last commit was rejected for being outside the AOP.
+        property bool _aopReject: false
+
         function open() {
             visible = true
             if (mapControl) {
@@ -314,6 +317,8 @@ Item {
         // every lat/lon edit - map picks land here too, since a pick writes the same
         // fields. An invalid pair clears the marker rather than leaving it stale.
         function _updatePending() {
+            // A fresh target edit clears any prior AOP rejection.
+            _aopReject = false
             if (!mapControl) {
                 return
             }
@@ -426,6 +431,17 @@ Item {
                 text:               qsTr("No vehicle connected.")
             }
 
+            // STRATUM: AOP rejection — the standoff target must lie inside the defined
+            // Area of Operations (mirrors the web UI's isInsideAOP check).
+            QGCLabel {
+                Layout.columnSpan:   2
+                Layout.maximumWidth: ScreenTools.defaultFontPixelWidth * 34
+                visible:             standoffPanel._aopReject
+                color:               "#EF5350"
+                wrapMode:            Text.WordWrap
+                text:                qsTr("Target is outside the defined AOP boundary — standoff rejected.")
+            }
+
             RowLayout {
                 Layout.columnSpan:  2
                 Layout.alignment:   Qt.AlignRight
@@ -450,6 +466,12 @@ Item {
                         if (isNaN(speed)   || speed <= 0)     { speed    = 0 }
                         var target = QtPositioning.coordinate(parseFloat(standoffLatField.text),
                                                               parseFloat(standoffLonField.text))
+                        // AOP enforcement: reject a target outside the defined AOP boundary.
+                        if (mapControl && !mapControl.isCoordinateInsideAOP(target)) {
+                            standoffPanel._aopReject = true
+                            return
+                        }
+                        standoffPanel._aopReject = false
                         mapControl.standoffCmdController.beginStandoff(distance, height, speed, direction, target)
                         standoffPanel.close()
                     }

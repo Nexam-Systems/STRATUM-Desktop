@@ -99,6 +99,27 @@ FlightMap {
         return false
     }
 
+    // STRATUM: AOP enforcement for coordinate-bearing commands (e.g. standoff). Mirrors
+    // the web UI's isInsideAOP rejection: returns true if the coordinate is allowed —
+    // either no usable AOP inclusion polygon is defined, or the coordinate falls inside
+    // one. Returns false only when an AOP exists and the coordinate is outside all of it.
+    function isCoordinateInsideAOP(coordinate) {
+        if (!_geoFenceController || !coordinate || !coordinate.isValid) {
+            return true
+        }
+        var haveAOP = false
+        for (var i = 0; i < _geoFenceController.polygons.count; i++) {
+            var poly = _geoFenceController.polygons.get(i)
+            if (poly && poly.inclusion && poly.count >= 3) {
+                haveAOP = true
+                if (poly.containsCoordinate(coordinate)) {
+                    return true
+                }
+            }
+        }
+        return !haveAOP
+    }
+
     // STRATUM: seed the default AOP box from the map CENTRE using fixed metric
     // offsets, NOT pixel->coordinate conversion. toCoordinate() returns an invalid
     // coordinate whenever the 2D map is not the actively rendered surface (3D viewer
