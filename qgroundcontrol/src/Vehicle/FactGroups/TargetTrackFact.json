@@ -1,0 +1,47 @@
+{
+    "version":      1,
+    "fileType":     "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "status",
+    "shortDesc":        "Tracker status (0=IDLE, 1=TRACKING, 2=LOST)",
+    "type":             "uint8"
+},
+{
+    "name":             "targetId",
+    "shortDesc":        "Selection id this track corresponds to",
+    "type":             "uint8"
+},
+{
+    "name":             "topLeftX",
+    "shortDesc":        "Tracked box top-left X, normalized 0..1",
+    "type":             "float",
+    "decimalPlaces":    3
+},
+{
+    "name":             "topLeftY",
+    "shortDesc":        "Tracked box top-left Y, normalized 0..1",
+    "type":             "float",
+    "decimalPlaces":    3
+},
+{
+    "name":             "botRightX",
+    "shortDesc":        "Tracked box bottom-right X, normalized 0..1",
+    "type":             "float",
+    "decimalPlaces":    3
+},
+{
+    "name":             "botRightY",
+    "shortDesc":        "Tracked box bottom-right Y, normalized 0..1",
+    "type":             "float",
+    "decimalPlaces":    3
+},
+{
+    "name":             "confidence",
+    "shortDesc":        "Track confidence 0..1",
+    "type":             "float",
+    "decimalPlaces":    2
+}
+]
+}

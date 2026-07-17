@@ -223,12 +223,6 @@ DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, tcpUrl)
     return _tcpUrlFact;
 }
 
-// STRATUM: stored TV / IR feed URLs. These do not drive the pipeline directly — the
-// TV/IR camera buttons copy the chosen one into rtspUrl (which restarts the stream),
-// so no _configChanged connection is needed here.
-DECLARE_SETTINGSFACT(VideoSettings, tvRtspUrl)
-DECLARE_SETTINGSFACT(VideoSettings, irRtspUrl)
-
 bool VideoSettings::streamConfigured(void)
 {
     //-- First, check if it's autoconfigured

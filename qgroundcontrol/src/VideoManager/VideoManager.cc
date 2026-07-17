@@ -34,7 +34,6 @@
 #include <QtCore/QPointer>
 #include <QtCore/QRunnable>
 #include <QtCore/QTimer>
-#include <QtNetwork/QUdpSocket>
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
@@ -74,90 +73,6 @@ VideoManager::VideoManager(QObject *parent)
 VideoManager::~VideoManager()
 {
     qCDebug(VideoManagerLog) << this;
-}
-
-bool VideoManager::sendCameraAction(const QString &action)
-{
-    const QString normalizedAction = action.trimmed().toLower();
-    QByteArray payload;
-    if (normalizedAction == "zoom-in") {
-        payload = QByteArrayLiteral("#TPUD2wDZM0A65");
-    } else if (normalizedAction == "zoom-out") {
-        payload = QByteArrayLiteral("#TPUD2wDZM0B66");
-    } else if (normalizedAction == "pan-up") {
-        payload = QByteArrayLiteral("#TPUG2wGSP1E6C");
-    } else if (normalizedAction == "pan-down") {
-        payload = QByteArrayLiteral("#TPUG2wGSPE26D");
-    } else if (normalizedAction == "tilt-left") {
-        payload = QByteArrayLiteral("#TPUG2wGSYE276");
-    } else if (normalizedAction == "tilt-right") {
-        payload = QByteArrayLiteral("#TPUG2wGSY1E75");
-    } else if (normalizedAction == "stop") {
-        payload = QByteArrayLiteral("#TPUG2wPTZ006A");
-    } else if (normalizedAction == "center") {
-        payload = QByteArrayLiteral("#TPUG2wPTZ056F");
-    } else if (normalizedAction == "capture") {
-        payload = QByteArrayLiteral("#TPUD2wCAP013E");
-    } else if (normalizedAction == "rec-start") {
-        payload = QByteArrayLiteral("#TPUD2wREC0144");
-    } else if (normalizedAction == "rec-stop") {
-        payload = QByteArrayLiteral("#TPUD2wREC0043");
-    } else if (normalizedAction == "track-center") {
-        payload = QByteArrayLiteral("#TPUG8wGOT0280016895");
-    } else if (normalizedAction == "track-stop") {
-        payload = QByteArrayLiteral("#TPUG2wSUM0061");
-    } else if (normalizedAction == "track-ack") {
-        payload = QByteArrayLiteral("#TPUG2wSUM0162");
-    } else if (normalizedAction == "palette-off") {
-        payload = QByteArrayLiteral("#TPUD2wIMG0046");
-    } else if (normalizedAction == "palette-01") {
-        payload = QByteArrayLiteral("#TPUD2wIMG0147");
-    } else if (normalizedAction == "palette-03") {
-        payload = QByteArrayLiteral("#TPUD2wIMG0349");
-    } else if (normalizedAction == "palette-04") {
-        payload = QByteArrayLiteral("#TPUD2wIMG044A");
-    } else if (normalizedAction == "palette-05") {
-        payload = QByteArrayLiteral("#TPUD2wIMG054B");
-    } else if (normalizedAction == "palette-06") {
-        payload = QByteArrayLiteral("#TPUD2wIMG064C");
-    } else if (normalizedAction == "palette-07") {
-        payload = QByteArrayLiteral("#TPUD2wIMG074D");
-    } else if (normalizedAction == "palette-08") {
-        payload = QByteArrayLiteral("#TPUD2wIMG084E");
-    } else if (normalizedAction == "palette-09") {
-        payload = QByteArrayLiteral("#TPUD2wIMG094F");
-    } else if (normalizedAction == "palette-0a") {
-        payload = QByteArrayLiteral("#TPUD2wIMG0A57");
-    } else if (normalizedAction == "palette-0b") {
-        payload = QByteArrayLiteral("#TPUD2wIMG0B58");
-    } else if (normalizedAction == "palette-0c") {
-        payload = QByteArrayLiteral("#TPUD2wIMG0C59");
-    } else {
-        return false;
-    }
-
-    QUdpSocket socket;
-    const QHostAddress host(QStringLiteral("192.168.144.108"));
-    return socket.writeDatagram(payload, host, 5000) == payload.size();
-}
-
-bool VideoManager::sendCameraTrackPoint(int x, int y)
-{
-    const int clampedX = qBound(0, x, 1280);
-    const int clampedY = qBound(0, y, 720);
-    const QString xHex = QString::number(clampedX, 16).toUpper().rightJustified(4, '0');
-    const QString yHex = QString::number(clampedY, 16).toUpper().rightJustified(4, '0');
-    const QByteArray base = QByteArrayLiteral("#TPUG8wGOT") + xHex.toUtf8() + yHex.toUtf8();
-
-    int sum = 0;
-    for (int i = 0; i < base.size(); ++i) {
-        sum += static_cast<unsigned char>(base.at(i));
-    }
-
-    const QByteArray payload = base + QByteArray::number(sum & 0xFF, 16).toUpper().rightJustified(2, '0');
-    QUdpSocket socket;
-    const QHostAddress host(QStringLiteral("192.168.144.108"));
-    return socket.writeDatagram(payload, host, 5000) == payload.size();
 }
 
 VideoManager *VideoManager::instance()

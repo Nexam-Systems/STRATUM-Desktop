@@ -6,8 +6,6 @@
 #include <QtCore/QSize>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-#include <QtCore/QString>
-
 #include <functional>
 #include <memory>
 
@@ -57,8 +55,6 @@ public:
     Q_INVOKABLE void startVideo();
     Q_INVOKABLE void stopRecording();
     Q_INVOKABLE void stopVideo();
-    Q_INVOKABLE bool sendCameraAction(const QString &action);
-    Q_INVOKABLE bool sendCameraTrackPoint(int x, int y);
 
     void init(QQuickWindow *mainWindow);
     void startGStreamerInit();

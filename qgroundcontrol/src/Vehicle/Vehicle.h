@@ -53,6 +53,7 @@ class VehicleVibrationFactGroup;
 class VehicleWindFactGroup;
 class VehicleEngagementStatusFactGroup;   // STRATUM
 class VehicleVisionEngagementStatusFactGroup;   // STRATUM
+class VehicleTargetTrackFactGroup;   // STRATUM
 class Autotune;
 class ComponentInformationManager;
 class MAVLinkEventManager;
@@ -242,6 +243,7 @@ public:
     Q_PROPERTY(FactGroup*           vibration       READ vibrationFactGroup         CONSTANT)
     Q_PROPERTY(FactGroup*           engagementStatus READ engagementStatusFactGroup CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           visionEngagementStatus READ visionEngagementStatusFactGroup CONSTANT)   // STRATUM
+    Q_PROPERTY(FactGroup*           targetTrack     READ targetTrackFactGroup       CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           temperature     READ temperatureFactGroup       CONSTANT)
     Q_PROPERTY(FactGroup*           clock           READ clockFactGroup             CONSTANT)
     Q_PROPERTY(FactGroup*           setpoint        READ setpointFactGroup          CONSTANT)
@@ -395,6 +397,25 @@ public:
 
     /// Sends PARAM_MAP_RC message to vehicle
     Q_INVOKABLE void sendParamMapRC(const QString& paramName, double scale, double centerValue, int tuningID, double minValue, double maxValue);
+
+    /// STRATUM: send an operator visual target designation (NEXAM_TARGET_SELECT / 42003)
+    /// to the companion tracker. Coordinates are normalized to the video frame
+    /// (0..1, origin top-left). action: 1 = SELECT/start, 0 = CANCEL/stop.
+    /// Called from the FlyView video overlay when the operator clicks or drags a box.
+    Q_INVOKABLE void sendTargetSelect(double topLeftX, double topLeftY, double botRightX, double botRightY, int action = 1);
+
+    /// STRATUM: enable/disable the companion visual tracker. Updates the stored tracker
+    /// config and packs+sends a full NEXAM_TRACKER_CONFIG (42005) to the companion.
+    /// Called by the FlyView tracking on/off button. This enables/disables an already-
+    /// running tracker node; it does not spawn a process.
+    Q_INVOKABLE void setTrackerEnabled(bool on);
+
+    /// STRATUM: set the tracker ROI (region the tracker searches within). centerX/centerY
+    /// are normalized 0..1 (fixed at 0.5 for now, D5); sizeDiag is the ROI diagonal as a
+    /// fraction of the full-frame diagonal. Updates the stored tracker config and packs+
+    /// sends a full NEXAM_TRACKER_CONFIG (42005) to the companion. Called by the FlyView
+    /// PiP ROI overlay.
+    Q_INVOKABLE void setTrackerRoi(float centerX, float centerY, float sizeDiag);
 
     /// Clears all PARAM_MAP_RC settings from vehicle
     Q_INVOKABLE void clearAllParamMapRC(void);
@@ -566,6 +587,7 @@ public:
     FactGroup* vibrationFactGroup           ();
     FactGroup* engagementStatusFactGroup    ();   // STRATUM
     FactGroup* visionEngagementStatusFactGroup ();   // STRATUM
+    FactGroup* targetTrackFactGroup         ();   // STRATUM
     FactGroup* temperatureFactGroup         ();
     FactGroup* clockFactGroup               ();
     FactGroup* setpointFactGroup            ();
@@ -906,6 +928,8 @@ private:
     void _flightTimerStart              ();
     void _flightTimerStop               ();
     void _setMessageInterval            (int messageId, int rate);
+    // STRATUM: pack + broadcast a full NEXAM_TRACKER_CONFIG (42005) from current state.
+    void _sendTrackerConfig             ();
     bool setFlightModeCustom            (const QString& flightMode, uint8_t* base_mode, uint32_t* custom_mode);
     QString _formatMavCommand           (MAV_CMD command, float param1);
 
@@ -1075,6 +1099,14 @@ public:
     bool _multirotor_speed_limits_available = false;
     bool _fixed_wing_airspeed_limits_available = false;
 
+    // STRATUM: current companion tracker config, packed into NEXAM_TRACKER_CONFIG (42005)
+    // by setTrackerEnabled()/setTrackerRoi(). Each invokable updates one field and sends
+    // a full config, so these members are the single source of truth for the whole msg.
+    bool  _trackerEnabled = false;
+    float _roiCenterX     = 0.5f;
+    float _roiCenterY     = 0.5f;
+    float _roiSize        = 0.5f;   // ROI diagonal as a fraction of the full-frame diagonal
+
     // FactGroup facts
 
     const QString _vehicleFactGroupName =            QStringLiteral("vehicle");
@@ -1085,6 +1117,7 @@ public:
     const QString _vibrationFactGroupName =          QStringLiteral("vibration");
     const QString _engagementStatusFactGroupName =   QStringLiteral("engagementStatus");   // STRATUM
     const QString _visionEngagementStatusFactGroupName = QStringLiteral("visionEngagementStatus");   // STRATUM
+    const QString _targetTrackFactGroupName =        QStringLiteral("targetTrack");   // STRATUM
     const QString _temperatureFactGroupName =        QStringLiteral("temperature");
     const QString _clockFactGroupName =              QStringLiteral("clock");
     const QString _setpointFactGroupName =           QStringLiteral("setpoint");
@@ -1107,6 +1140,7 @@ public:
     VehicleVibrationFactGroup*          _vibrationFactGroup         = nullptr;
     VehicleEngagementStatusFactGroup*   _engagementStatusFactGroup  = nullptr;   // STRATUM
     VehicleVisionEngagementStatusFactGroup* _visionEngagementStatusFactGroup = nullptr;   // STRATUM
+    VehicleTargetTrackFactGroup*        _targetTrackFactGroup       = nullptr;   // STRATUM
     VehicleTemperatureFactGroup*        _temperatureFactGroup       = nullptr;
     VehicleClockFactGroup*              _clockFactGroup             = nullptr;
     VehicleSetpointFactGroup*           _setpointFactGroup          = nullptr;

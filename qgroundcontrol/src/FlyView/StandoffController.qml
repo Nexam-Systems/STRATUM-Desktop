@@ -7,85 +7,88 @@ import QGroundControl.FlyView
 
 // STRATUM: Standoff command controller.
 //
-// A standoff is an orbit around a target: the vehicle circles the target at a fixed
-// distance and height. The command contract mirrors the UAV-VAS web UI EXACTLY — two
-// COMMAND_LONG messages addressed to the bridge companion computer (component 191, the
-// same component the servo/dropper commands target):
-//
-//   31010 (params):   p1 = target latitude   [deg]
-//                     p2 = target longitude  [deg]
-//                     p3 = distance          [m]
-//                     p4 = height AGL        [m]
-//                     p5 = speed             [km/h]
-//                     p6 = direction         (0 = N, 1 = E, 2 = S, 3 = W)
-//   31011 (activate): p1 = 1  -> begin orbit   (p1 = 0 -> abort)
-//
-// The bridge owns the orbit math and flight-mode handling; QGC's PX4 Standoff
-// flight-mode path is intentionally NOT used here so the wire contract stays identical
-// to the web UI the drone was validated against.
+// A standoff is a static hold relative to a target: the vehicle flies to a point
+// offset from the target by the standoff distance, on the standoff bearing, at the
+// standoff height, and faces the target. Geometrically this is one point on an orbit
+// of radius = distance, centred on the target, at altitude = height. Once the vehicle
+// arrives, the operator may promote the static hold into a live orbit using exactly
+// those parameters.
 Item {
     id: root
 
     property var    guidedController
     property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
+    property var    _unitsConversion:   QGroundControl.unitsConversion
 
-    // Committed standoff state. _standoffDistance drives the on-map surveillance circle.
+    // Pending / active standoff state (all distances in METERS, angle in DEGREES)
     property var    _targetCoordinate:  QtPositioning.coordinate()
-    property real   _standoffDistance:  0    // orbit distance / radius [m]
-    property real   _standoffHeight:    0    // height AGL [m]
-    property real   _standoffSpeed:     0    // [km/h]
-    property int    _standoffDirection: 0    // 0 = N, 1 = E, 2 = S, 3 = W
+    property var    _standoffPoint:     QtPositioning.coordinate()
+    property real   _standoffDistance:  0
+    property real   _standoffHeight:    0
+    property real   _standoffAngle:     0
     // True from the moment a standoff is committed until it is cancelled. Drives the
     // on-map surveillance circle (centre = target, radius = standoff distance).
     property bool   _standoffActive:    false
 
-    // STRATUM: bridge companion computer + standoff command ids (web UI contract).
-    readonly property int _bridgeComponentId:   191
-    readonly property int _cmdStandoffParams:   31010
-    readonly property int _cmdStandoffActivate: 31011
+    // Emitted whenever a new standoff point is computed; consumers (e.g. the map)
+    // may use this to render a target / standoff indicator.
+    signal standoffPointChanged(var targetCoordinate, var standoffCoordinate)
 
-    // distanceMeters / heightMeters are in METERS, speed in KM/H, direction is a
-    // cardinal index (0=N,1=E,2=S,3=W). targetCoordinate carries the target designated
-    // in the Set Standoff panel (manual lat/lon entry or crosshair map pick).
-    function beginStandoff(distanceMeters, heightMeters, speed, direction, targetCoordinate) {
+    QGCPopupDialogFactory {
+        id:              orbitPromptFactory
+        dialogComponent: orbitPromptComponent
+    }
+    Component {
+        id: orbitPromptComponent
+        StandoffOrbitDialog { standoffController: root }
+    }
+
+    // distanceUnits / heightUnits are in the user's configured units; angleDeg is a
+    // compass bearing (0 = North, clockwise). targetCoordinate carries the target
+    // designated in the Set Standoff panel (manual lat/lon entry or crosshair map
+    // pick); the legacy map-click dialog path has been retired.
+    function beginStandoff(distanceUnits, heightUnits, angleDeg, targetCoordinate) {
         if (!_activeVehicle) {
             return
         }
         if (targetCoordinate !== undefined && targetCoordinate.isValid) {
             _targetCoordinate = targetCoordinate
         }
-        if (!_targetCoordinate.isValid) {
-            return
-        }
-        _standoffDistance  = distanceMeters
-        _standoffHeight    = heightMeters
-        _standoffSpeed     = speed
-        _standoffDirection = direction
+        _standoffDistance = _unitsConversion.appSettingsHorizontalDistanceUnitsToMeters(distanceUnits)
+        _standoffHeight   = _unitsConversion.appSettingsVerticalDistanceUnitsToMeters(heightUnits)
+        _standoffAngle    = angleDeg
+        // Client-side offset point is used ONLY to draw the on-map surveillance circle.
+        // PX4 recomputes the real hold point from the target + geometry we send below.
+        _standoffPoint    = _targetCoordinate.atDistanceAndAzimuth(_standoffDistance, _standoffAngle)
+        standoffPointChanged(_targetCoordinate, _standoffPoint)
 
-        // Step 1: send orbit parameters (31010). Step 2: activate (31011). QGC queues
-        // the two commands and sends the activate after the params are acknowledged,
-        // matching the web UI's SEND PARAMS -> EXECUTE sequence in a single action.
-        _activeVehicle.sendCommand(_bridgeComponentId, _cmdStandoffParams, true,
-                                   _targetCoordinate.latitude,
-                                   _targetCoordinate.longitude,
-                                   distanceMeters,
-                                   heightMeters,
-                                   speed,
-                                   direction,
-                                   0)
-        _activeVehicle.sendCommand(_bridgeComponentId, _cmdStandoffActivate, true,
-                                   1, 0, 0, 0, 0, 0, 0)
+        // STRATUM: drive the in-firmware PX4 Standoff flight mode. We hand PX4 the TARGET
+        // point plus the standoff geometry (distance, bearing, RELATIVE height); PX4 owns
+        // the offset math and yaws to face the target itself. Send the geometry BEFORE the
+        // mode switch so the standoff_setpoint exists when the mode activates.
+        _activeVehicle.guidedModeStandoff(_targetCoordinate, _standoffDistance, _standoffAngle, _standoffHeight)
+        _activeVehicle.flightMode = "Standoff"
 
         _standoffActive = true
     }
 
-    // Abort the standoff/orbit on the bridge (31011 activate=0), matching the web UI
-    // ABORT / standoff-cancel path, and hide the surveillance circle.
-    function cancelStandoff() {
-        if (_activeVehicle) {
-            _activeVehicle.sendCommand(_bridgeComponentId, _cmdStandoffActivate, true,
-                                       0, 0, 0, 0, 0, 0, 0)
+    // Promote the static standoff into an orbit using the same geometry.
+    function confirmOrbit() {
+        if (!_activeVehicle) {
+            return
         }
+        // Mirrors the stock orbit path (home altitude + relative height). Positive radius
+        // => clockwise orbit around the target. The surveillance circle stays visible and
+        // now depicts the active orbit area.
+        var amslAltitude = _activeVehicle.homePosition.altitude + _standoffHeight
+        _activeVehicle.guidedModeOrbit(_targetCoordinate, _standoffDistance, amslAltitude)
+    }
+
+    function cancelStandoff() {
         _standoffActive = false
     }
+
+    // STRATUM: no client-side arrival/heading handling. The PX4 Standoff flight mode flies
+    // to the hold point and yaws to face the target on its own; an extra DO_REPOSITION or
+    // change-heading command would fight the mode.
 }

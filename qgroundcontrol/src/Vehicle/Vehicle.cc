@@ -21,6 +21,7 @@
 #include "VehicleVibrationFactGroup.h"
 #include "VehicleEngagementStatusFactGroup.h"   // STRATUM
 #include "VehicleVisionEngagementStatusFactGroup.h"   // STRATUM
+#include "VehicleTargetTrackFactGroup.h"   // STRATUM
 #include "VehicleWindFactGroup.h"
 #include "VehicleSupports.h"
 #include "ADSBVehicleManager.h"
@@ -317,6 +318,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _vibrationFactGroup             = new VehicleVibrationFactGroup(this);
     _engagementStatusFactGroup      = new VehicleEngagementStatusFactGroup(this);   // STRATUM
     _visionEngagementStatusFactGroup = new VehicleVisionEngagementStatusFactGroup(this);   // STRATUM
+    _targetTrackFactGroup           = new VehicleTargetTrackFactGroup(this);   // STRATUM
     _temperatureFactGroup           = new VehicleTemperatureFactGroup(this);
     _clockFactGroup                 = new VehicleClockFactGroup(this);
     _setpointFactGroup              = new VehicleSetpointFactGroup(this);
@@ -353,6 +355,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _addFactGroup(_vibrationFactGroup,         _vibrationFactGroupName);
     _addFactGroup(_engagementStatusFactGroup,  _engagementStatusFactGroupName);   // STRATUM
     _addFactGroup(_visionEngagementStatusFactGroup, _visionEngagementStatusFactGroupName);   // STRATUM
+    _addFactGroup(_targetTrackFactGroup,       _targetTrackFactGroupName);   // STRATUM
     _addFactGroup(_temperatureFactGroup,       _temperatureFactGroupName);
     _addFactGroup(_clockFactGroup,             _clockFactGroupName);
     _addFactGroup(_setpointFactGroup,          _setpointFactGroupName);
@@ -421,6 +424,7 @@ FactGroup* Vehicle::windFactGroup()                 { return _windFactGroup; }
 FactGroup* Vehicle::vibrationFactGroup()            { return _vibrationFactGroup; }
 FactGroup* Vehicle::engagementStatusFactGroup()     { return _engagementStatusFactGroup; }   // STRATUM
 FactGroup* Vehicle::visionEngagementStatusFactGroup() { return _visionEngagementStatusFactGroup; }   // STRATUM
+FactGroup* Vehicle::targetTrackFactGroup()          { return _targetTrackFactGroup; }   // STRATUM
 FactGroup* Vehicle::temperatureFactGroup()          { return _temperatureFactGroup; }
 FactGroup* Vehicle::clockFactGroup()                { return _clockFactGroup; }
 FactGroup* Vehicle::setpointFactGroup()             { return _setpointFactGroup; }
@@ -2976,6 +2980,148 @@ void Vehicle::sendParamMapRC(const QString& paramName, double scale, double cent
                                        static_cast<float>(minValue),
                                        static_cast<float>(maxValue));
     sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+}
+
+void Vehicle::sendTargetSelect(double topLeftX, double topLeftY, double botRightX, double botRightY, int action)
+{
+    // STRATUM: operator visual target designation. Packs NEXAM_TARGET_SELECT (42003)
+    // and sends it to the companion tracker. The companion (mission computer)
+    // initializes its OpenCV tracker from this box and then streams
+    // NEXAM_TARGET_TRACK (42004) back, decoded by VehicleTargetTrackFactGroup and
+    // drawn by the FlyView video overlay.
+    //
+    // Sent on EVERY link of the vehicle, not just the primary. In SITL the autopilot
+    // (PX4) and the companion tracker often reach STRATUM over different links (PX4
+    // direct, tracker via mavlink-router). The primary link is usually the autopilot's,
+    // which would swallow the designation. Broadcasting across all links guarantees the
+    // companion receives it regardless of topology; the autopilot simply ignores an
+    // unknown message id.
+    // VehicleLinkManager has no public link list, so take the app-wide links and keep
+    // the ones that belong to this vehicle.
+    QList<SharedLinkInterfacePtr> vehicleLinks;
+    const QList<SharedLinkInterfacePtr> allLinks = LinkManager::instance()->links();
+    for (const SharedLinkInterfacePtr &link : allLinks) {
+        if (link && vehicleLinkManager()->containsLink(link.get())) {
+            vehicleLinks.append(link);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        // Fall back to the primary link if the filter came up empty.
+        SharedLinkInterfacePtr primary = vehicleLinkManager()->primaryLink().lock();
+        if (primary) {
+            vehicleLinks.append(primary);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        qCDebug(VehicleLog) << "sendTargetSelect: no links!";
+        return;
+    }
+
+    // Monotonic selection id so the companion can distinguish re-designations.
+    static uint8_t targetSelectId = 0;
+    if (action != 0) {
+        targetSelectId++;
+    }
+
+    // Clamp to the normalized video frame; the overlay already normalizes, this is
+    // defence in depth against degenerate input.
+    const auto clamp01 = [](double v) { return static_cast<float>(v < 0.0 ? 0.0 : (v > 1.0 ? 1.0 : v)); };
+
+    for (const SharedLinkInterfacePtr &link : vehicleLinks) {
+        if (!link) {
+            continue;
+        }
+        mavlink_message_t message;
+        mavlink_msg_nexam_target_select_pack_chan(
+            static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+            static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+            link->mavlinkChannel(),
+            &message,
+            clamp01(topLeftX),
+            clamp01(topLeftY),
+            clamp01(botRightX),
+            clamp01(botRightY),
+            static_cast<uint8_t>(_systemID),                    // target_system: companion shares the vehicle sysid
+            static_cast<uint8_t>(MAV_COMP_ID_ONBOARD_COMPUTER), // target_component: companion tracker
+            static_cast<uint8_t>(action),
+            targetSelectId);
+        sendMessageOnLinkThreadSafe(link.get(), message);
+    }
+}
+
+void Vehicle::setTrackerEnabled(bool on)
+{
+    // STRATUM: on/off toggle for the companion visual tracker. Update the stored state
+    // and re-send the full NEXAM_TRACKER_CONFIG so enable + current ROI travel together.
+    _trackerEnabled = on;
+    _sendTrackerConfig();
+}
+
+void Vehicle::setTrackerRoi(float centerX, float centerY, float sizeDiag)
+{
+    // STRATUM: ROI-scoping from the PiP overlay. Update the stored ROI and re-send the
+    // full config so the ROI + current enable state travel together.
+    const auto clamp01f = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
+    _roiCenterX = clamp01f(centerX);
+    _roiCenterY = clamp01f(centerY);
+    _roiSize    = clamp01f(sizeDiag);
+    _sendTrackerConfig();
+}
+
+void Vehicle::_sendTrackerConfig()
+{
+    // STRATUM: pack a FULL NEXAM_TRACKER_CONFIG (42005) from the combined current tracker
+    // state and broadcast it to the companion, mirroring sendTargetSelect's channel /
+    // broadcast / target-addressing (target_system = vehicle sysid, target_component =
+    // MAV_COMP_ID_ONBOARD_COMPUTER). Every invokable that changes one field sends the
+    // whole message, so a dropped frame never leaves enable and ROI out of sync.
+    //
+    // NOTE: mavlink_msg_nexam_tracker_config_pack_chan (and the message id) do not exist
+    // until STRATUM's mavlink C headers are regenerated from stratum.xml with the 42005
+    // block added (see stratum_tracker/ROI_REGEN_NOTE.md). This will not compile until
+    // that regeneration is done.
+    QList<SharedLinkInterfacePtr> vehicleLinks;
+    const QList<SharedLinkInterfacePtr> allLinks = LinkManager::instance()->links();
+    for (const SharedLinkInterfacePtr &link : allLinks) {
+        if (link && vehicleLinkManager()->containsLink(link.get())) {
+            vehicleLinks.append(link);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        // Fall back to the primary link if the filter came up empty.
+        SharedLinkInterfacePtr primary = vehicleLinkManager()->primaryLink().lock();
+        if (primary) {
+            vehicleLinks.append(primary);
+        }
+    }
+    if (vehicleLinks.isEmpty()) {
+        qCDebug(VehicleLog) << "sendTrackerConfig: no links!";
+        return;
+    }
+
+    // Monotonic config id so the companion can distinguish successive configs.
+    static uint8_t trackerConfigId = 0;
+    trackerConfigId++;
+
+    for (const SharedLinkInterfacePtr &link : vehicleLinks) {
+        if (!link) {
+            continue;
+        }
+        mavlink_message_t message;
+        mavlink_msg_nexam_tracker_config_pack_chan(
+            static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+            static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+            link->mavlinkChannel(),
+            &message,
+            _roiCenterX,
+            _roiCenterY,
+            _roiSize,
+            static_cast<uint8_t>(_systemID),                    // target_system: companion shares the vehicle sysid
+            static_cast<uint8_t>(MAV_COMP_ID_ONBOARD_COMPUTER), // target_component: companion tracker
+            static_cast<uint8_t>(_trackerEnabled ? 1 : 0),
+            trackerConfigId);
+        sendMessageOnLinkThreadSafe(link.get(), message);
+    }
 }
 
 void Vehicle::clearAllParamMapRC(void)

@@ -589,6 +589,9 @@ Item {
             _activeVehicle.guidedModeLand()
             break
         case actionTakeoff:
+            // STRATUM: verified -- takeoff issues MAV_CMD_NAV_TAKEOFF via guidedModeTakeoff()
+            // with the operator-entered altitude, NOT a bare flight-mode set. This is the
+            // fix for the inert "Takeoff mode" behaviour; do not re-route this to a mode select.
             if (_activeVehicle.supports.guidedTakeoffWithAltitude) {
                 var valueInMeters = _unitsConversion.appSettingsVerticalDistanceUnitsToMeters(sliderOutputValue)
                 _activeVehicle.guidedModeTakeoff(valueInMeters)

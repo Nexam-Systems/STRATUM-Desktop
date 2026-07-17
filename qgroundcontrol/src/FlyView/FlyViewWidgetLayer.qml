@@ -22,8 +22,6 @@ Item {
     property var    totalToolInsets:        _totalToolInsets
     property var    mapControl
     property var    engagementController    // STRATUM: forwarded to the Engage trigger
-    property bool   cameraMaximized:        false   // STRATUM: video is the maximized window
-    property var    standoffController              // STRATUM: forwarded to the dropper drop check
 
     property var    _activeVehicle:         QGroundControl.multiVehicleManager.activeVehicle
     property var    _planMasterController:  globals.planMasterControllerFlyView
@@ -231,8 +229,6 @@ Item {
         anchors.left:           parent.left
         anchors.top:            parent.top
         engagementController:    _root.engagementController
-        cameraMaximized:         _root.cameraMaximized
-        standoffController:      _root.standoffController
         z:                      QGroundControl.zOrderWidgets
         maxHeight:              parent.height - y - parentToolInsets.bottomEdgeLeftInset - _toolsMargin
         visible:                !QGroundControl.videoManager.fullScreen
@@ -267,8 +263,8 @@ Item {
     // the map centre. The operator either types the target lat/lon or clicks the map
     // while the crosshair pick cursor is active (FlyViewMap._standoffPickMode) - both
     // paths fill the same fields, and the last writer wins. Commit goes through
-    // StandoffController.beginStandoff, which sends the web-UI standoff contract
-    // (cmd 31010 params + 31011 activate) to the bridge companion computer.
+    // StandoffController.beginStandoff with the coordinate, so the geometry contract
+    // with PX4 (target + distance / bearing / relative height) is unchanged.
     Rectangle {
         id:                 standoffPanel
         visible:            false
@@ -288,9 +284,6 @@ Item {
             var lon = parseFloat(standoffLonField.text)
             return !isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
         }
-
-        // STRATUM: set when the last commit was rejected for being outside the AOP.
-        property bool _aopReject: false
 
         function open() {
             visible = true
@@ -317,8 +310,6 @@ Item {
         // every lat/lon edit - map picks land here too, since a pick writes the same
         // fields. An invalid pair clears the marker rather than leaving it stale.
         function _updatePending() {
-            // A fresh target edit clears any prior AOP rejection.
-            _aopReject = false
             if (!mapControl) {
                 return
             }
@@ -381,45 +372,34 @@ Item {
                 onTextChanged:         standoffPanel._updatePending()
             }
 
-            // STRATUM: raw metres / km-h to match the web UI standoff contract exactly
-            // (the values are sent verbatim to the bridge in cmd 31010).
-            QGCLabel { text: qsTr("Distance") }
+            QGCLabel { text: qsTr("Standoff distance") }
             QGCTextField {
                 id:                    standoffDistanceField
                 Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
-                text:                  "300"
-                unitsLabel:            qsTr("m")
+                text:                  "50"
+                unitsLabel:            QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
                 showUnits:             true
                 inputMethodHints:      Qt.ImhFormattedNumbersOnly
             }
 
-            QGCLabel { text: qsTr("Height AGL") }
+            QGCLabel { text: qsTr("Standoff height") }
             QGCTextField {
                 id:                    standoffHeightField
                 Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
-                text:                  "150"
-                unitsLabel:            qsTr("m")
-                showUnits:             true
-                inputMethodHints:      Qt.ImhFormattedNumbersOnly
-            }
-
-            QGCLabel { text: qsTr("Speed") }
-            QGCTextField {
-                id:                    standoffSpeedField
-                Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
                 text:                  "30"
-                unitsLabel:            qsTr("km/h")
+                unitsLabel:            QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
                 showUnits:             true
                 inputMethodHints:      Qt.ImhFormattedNumbersOnly
             }
 
             QGCLabel { text: qsTr("Direction") }
-            QGCComboBox {
-                id:                    standoffDirectionCombo
+            QGCTextField {
+                id:                    standoffDirectionField
                 Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 16
-                currentIndex:          0
-                // Index maps directly to the web UI direction value (0=N,1=E,2=S,3=W).
-                model:                 [qsTr("North ↑"), qsTr("East →"), qsTr("South ↓"), qsTr("West ←")]
+                text:                  "0"
+                unitsLabel:            qsTr("deg (from N)")
+                showUnits:             true
+                inputMethodHints:      Qt.ImhFormattedNumbersOnly
             }
 
             // STRATUM: the command needs a vehicle; surface that instead of failing
@@ -429,17 +409,6 @@ Item {
                 visible:            !_activeVehicle
                 color:              "#F2C200"
                 text:               qsTr("No vehicle connected.")
-            }
-
-            // STRATUM: AOP rejection — the standoff target must lie inside the defined
-            // Area of Operations (mirrors the web UI's isInsideAOP check).
-            QGCLabel {
-                Layout.columnSpan:   2
-                Layout.maximumWidth: ScreenTools.defaultFontPixelWidth * 34
-                visible:             standoffPanel._aopReject
-                color:               "#EF5350"
-                wrapMode:            Text.WordWrap
-                text:                qsTr("Target is outside the defined AOP boundary — standoff rejected.")
             }
 
             RowLayout {
@@ -457,22 +426,17 @@ Item {
                     primary:    true
                     enabled:    standoffPanel._coordValid && _activeVehicle !== null
                     onClicked: {
-                        var distance  = parseFloat(standoffDistanceField.text)
-                        var height    = parseFloat(standoffHeightField.text)
-                        var speed     = parseFloat(standoffSpeedField.text)
-                        var direction = standoffDirectionCombo.currentIndex   // 0=N,1=E,2=S,3=W
+                        var distance = parseFloat(standoffDistanceField.text)
+                        var height   = parseFloat(standoffHeightField.text)
+                        var angle    = parseFloat(standoffDirectionField.text)
                         if (isNaN(distance) || distance <= 0) { distance = 0 }
-                        if (isNaN(height))                    { height   = 0 }
-                        if (isNaN(speed)   || speed <= 0)     { speed    = 0 }
+                        if (isNaN(height))                     { height   = 0 }
+                        if (isNaN(angle))                      { angle    = 0 }
+                        // Normalize bearing into [0, 360)
+                        angle = ((angle % 360) + 360) % 360
                         var target = QtPositioning.coordinate(parseFloat(standoffLatField.text),
                                                               parseFloat(standoffLonField.text))
-                        // AOP enforcement: reject a target outside the defined AOP boundary.
-                        if (mapControl && !mapControl.isCoordinateInsideAOP(target)) {
-                            standoffPanel._aopReject = true
-                            return
-                        }
-                        standoffPanel._aopReject = false
-                        mapControl.standoffCmdController.beginStandoff(distance, height, speed, direction, target)
+                        mapControl.standoffCmdController.beginStandoff(distance, height, angle, target)
                         standoffPanel.close()
                     }
                 }

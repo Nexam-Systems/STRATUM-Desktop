@@ -34,9 +34,6 @@ qt_add_qml_module(FlyViewModule
         FlyViewAOPAction.qml
         FlyViewBottomRightRowLayout.qml
         FlyViewCustomLayer.qml
-        FlyViewCameraControls.qml
-        FlyViewDropperAction.qml
-        FlyViewDropperPanel.qml
         FlyViewInsetViewer.qml
         FlyViewInstrumentPanel.qml
         FlyViewGripperButton.qml
@@ -57,8 +54,11 @@ qt_add_qml_module(FlyViewModule
         GuidedActionChangeAltitude.qml
         GuidedActionChangeSpeed.qml
         GuidedActionConfirm.qml
+        GuidedActionHold.qml
+        GuidedActionLand.qml
         GuidedActionPause.qml
         GuidedActionRTL.qml
+        GuidedActionStandoffMode.qml
         GuidedActionsController.qml
         GuidedActionTakeoff.qml
         GuidedActionTakeoffDialog.qml
@@ -71,6 +71,8 @@ qt_add_qml_module(FlyViewModule
         ObstacleDistanceOverlayVideo.qml
         OnScreenCameraTrackingController.qml
         OnScreenGimbalController.qml
+        TargetTrackingOverlay.qml
+        TrackerRoiOverlay.qml
         PreFlightBatteryCheck.qml
         PreFlightCheckList.qml
         PreFlightCheckListShowAction.qml
@@ -82,9 +84,11 @@ qt_add_qml_module(FlyViewModule
         ProximityRadarVideoView.qml
         RoverChecklist.qml
         StandoffController.qml
+        StandoffOrbitDialog.qml
         SubChecklist.qml
         TelemetryValuesBar.qml
         TerrainProgress.qml
+        TrackingToggleAction.qml
         VehicleWarnings.qml
         VirtualJoystick.qml
         VTOLChecklist.qml
@@ -95,7 +99,6 @@ qt_add_resources(FlyViewModule flyview_resources
     PREFIX "/res"
     BASE "${CMAKE_SOURCE_DIR}/resources"
     FILES
-        "${CMAKE_SOURCE_DIR}/resources/DropArrow.svg"
         "${CMAKE_SOURCE_DIR}/resources/Gripper.svg"
         "${CMAKE_SOURCE_DIR}/resources/land.svg"
         "${CMAKE_SOURCE_DIR}/resources/NoVideoBackground.jpg"

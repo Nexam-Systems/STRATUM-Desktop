@@ -57,12 +57,6 @@ Item {
     property real   _fullItemZorder:    0
     property real   _pipItemZorder:     QGroundControl.zOrderWidgets
 
-    // STRATUM: true when the video (camera) is the maximized window rather than the
-    // map. Drives the on-video camera-control overlay and tells the dropper panel to
-    // fold its camera controls away (they live on the video instead). See req. 4.
-    readonly property bool _cameraMaximized: QGroundControl.videoManager.hasVideo &&
-                                             videoControl.pipState.state === videoControl.pipState.fullState
-
     function _calcCenterViewPort() {
         var newToolInset = Qt.rect(0, 0, width, height)
         toolstrip.adjustToolInset(newToolInset)
@@ -130,8 +124,6 @@ Item {
             parentToolInsets:       _toolInsets
             mapControl:             _mapControl
             engagementController:   engagementController
-            cameraMaximized:        _cameraMaximized
-            standoffController:     mapControl.standoffCmdController
             visible:                !QGroundControl.videoManager.fullScreen
         }
 
@@ -142,22 +134,6 @@ Item {
             parentToolInsets:   widgetLayer.totalToolInsets
             mapControl:         _mapControl
             visible:            !QGroundControl.videoManager.fullScreen
-        }
-
-        // STRATUM: camera / gimbal controls overlaid on the live video when the camera
-        // is the maximized window. Lives in mapHolder (not the widget layer) so it stays
-        // visible in full-screen video, where the widget layer is hidden. When the map is
-        // maximized this hides and the same controls fold back into the dropper panel's
-        // camera section (req. 4).
-        FlyViewCameraControls {
-            id:                     videoCameraOverlay
-            overlayMode:            true
-            anchors.right:          parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.rightMargin:    _toolsMargin
-            width:                  ScreenTools.defaultFontPixelWidth * 24
-            z:                      QGroundControl.zOrderWidgets + 1
-            visible:                _cameraMaximized
         }
 
         // Development tool for visualizing the insets for a paticular layer, show if needed
@@ -224,9 +200,8 @@ Item {
         }
 
         // Message display floats just above the bottom confirm bar. Defined here (not
-        // inside GuidedActionConfirm) so it is not clipped by the bar. Its opacity is
-        // driven by GuidedActionConfirm's own fade timer/animation (which target this
-        // rectangle through the messageDisplay property).
+        // inside GuidedActionConfirm) so it is not clipped and so messageFadeTimer /
+        // messageOpacityAnimation remain resolvable from the confirm control.
         Rectangle {
             id:                         guidedActionMessageDisplay
             anchors.bottom:             guidedActionConfirmBottomBar.top
@@ -234,6 +209,8 @@ Item {
             anchors.horizontalCenter:   guidedActionConfirmBottomBar.horizontalCenter
             width:                      messageLabel.contentWidth + (_margins * 2)
             height:                     messageLabel.contentHeight + (_margins * 2)
+            // Opacity is intentionally left unbound: GuidedActionConfirm drives it via
+            // messageFadeTimer / messageOpacityAnimation (fade out) and reset (back to 1).
             color:                      qgcPal.windowTransparent
             radius:                     ScreenTools.defaultBorderRadius
             visible:                    guidedActionConfirmBottom.visible
@@ -246,6 +223,21 @@ Item {
                 width:      ScreenTools.defaultFontPixelWidth * 30
                 wrapMode:   Text.WordWrap
                 text:       guidedActionConfirmBottom.message
+            }
+
+            PropertyAnimation {
+                id:         messageOpacityAnimation
+                target:     guidedActionMessageDisplay
+                property:   "opacity"
+                from:       1
+                to:         0
+                duration:   500
+            }
+
+            Timer {
+                id:             messageFadeTimer
+                interval:       4000
+                onTriggered:    messageOpacityAnimation.start()
             }
         }
 

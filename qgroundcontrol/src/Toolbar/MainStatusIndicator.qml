@@ -44,19 +44,13 @@ RowLayout {
         property string _engagingText:      qsTr("Engaging")
         property string _abortText:         qsTr("Abort")
 
-        // STRATUM: ribbon status reflects the live operational state. It is derived from
-        // the dynamic armed / flying / landing telemetry — a disarmed or landed vehicle
-        // can never read "Flying".
+        // STRATUM: ribbon status reflects operational mode.
         text: {
             if (!_activeVehicle) {
                 return _disconnectedText
             }
             if (_communicationLost) {
                 return _commLostText
-            }
-            // Disarmed on the ground: never "Flying" regardless of the last flight mode.
-            if (!_armed) {
-                return _readyToFlyText
             }
             var mode = _activeVehicle.flightMode
             if (mode === qsTr("Abort")) {
@@ -65,14 +59,14 @@ RowLayout {
             if (mode === qsTr("Engagement") || mode === qsTr("Vision Engagement")) {
                 return _engagingText
             }
-            if (_activeVehicle.landing) {
-                return _landingText
-            }
-            if (_activeVehicle.flying) {
+            if (mode === qsTr("Standoff") || mode === qsTr("Takeoff") ||
+                    mode === _activeVehicle.pauseFlightMode || _activeVehicle.flying) {
+                if (_activeVehicle.landing) {
+                    return _landingText
+                }
                 return _flyingText
             }
-            // Armed but still on the ground (e.g. pre-takeoff).
-            return _armedText
+            return _readyToFlyText
         }
         color:              ribbonTextColor
 

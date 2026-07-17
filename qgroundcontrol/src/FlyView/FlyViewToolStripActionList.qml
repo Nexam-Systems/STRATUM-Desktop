@@ -1,6 +1,4 @@
 import QtQml.Models
-import QtQuick.Controls
-import QtQuick.Dialogs
 
 import QGroundControl
 import QGroundControl.Controls
@@ -10,69 +8,27 @@ ToolStripActionList {
     id: _root
 
     property var engagementController    // STRATUM: engagement/abort safety-loop controller
-    property bool cameraMaximized: false // STRATUM: true when the video is the maximized window
-    property var standoffController      // STRATUM: supplies the standoff target for the drop safety check
 
     signal displayPreFlightChecklist
     signal defineAOP      // retained: emitters relocated to the ribbon (FlyViewToolBar)
     signal setStandoff    // retained: emitters relocated to the ribbon (FlyViewToolBar)
 
-    // STRATUM: Land / Hold command a flight-mode change the same way the flight-mode
-    // dropdown does (a direct, reliable write to Vehicle.flightMode by its advertised
-    // name), behind a simple confirm dialog. The old slide-to-confirm bar path was
-    // fragile in this fork, so these commands no longer depend on it.
-    function _commandFlightMode(modeName) {
-        if (!QGroundControl.multiVehicleManager.activeVehicle) {
-            return
-        }
-        QGroundControl.showMessageDialog(
-            mainWindow,
-            modeName,
-            qsTr("Switch the vehicle to %1 flight mode?").arg(modeName),
-            Dialog.Ok | Dialog.Cancel,
-            function() {
-                const vehicle = QGroundControl.multiVehicleManager.activeVehicle
-                if (vehicle) {
-                    vehicle.flightMode = modeName
-                }
-            })
-    }
-
-    // STRATUM: the command strip carries Standoff / Land / Hold / Abort / Engage / Vision
-    // Engage. Standoff opens the target-entry panel; Land and Hold switch flight mode
-    // directly (confirm dialog); Abort / Engage / Vision Engage drive their PX4 custom
-    // modes. Define AOP and Set Standoff live on the top ribbon.
+    // STRATUM: the command strip carries the flight-mode commands pulled from the mode
+    // menu -- Standoff / Land / Hold / Abort / Engagement / Vision Engagement -- each a
+    // hold-to-confirm button that switches FLIGHT MODE directly (the mode menu's working
+    // path). Define AOP and Set Standoff were relocated to the centre of the top ribbon.
+    //
+    // STRATUM: Takeoff is restored here as a guided ACTION (not a flight-mode select):
+    // it opens the altitude dialog and issues MAV_CMD_NAV_TAKEOFF via guidedModeTakeoff()
+    // (see GuidedActionTakeoff.qml -> showTakeoffDialog(), executed in
+    // GuidedActionsController.executeAction). It is grouped with Land, matching QGC's
+    // takeoff/land grouping convention. A Tracking on/off toggle is appended at the end.
     model: [
-        // STRATUM: Standoff opens the Set Standoff target-entry panel, which commits via
-        // the web-UI contract (cmd 31010 params + 31011 activate to the bridge). It does
-        // NOT switch to a hard-coded PX4 flight mode — the bridge enters "Standoff Mode"
-        // itself and QGC picks that mode up dynamically from AVAILABLE_MODES.
-        ToolStripAction {
-            text:        qsTr("Standoff")
-            iconSource:  "/qmlimages/StandoffMarker.svg"
-            visible:     true
-            enabled:     !!QGroundControl.multiVehicleManager.activeVehicle
-            onTriggered: _root.setStandoff()
-        },
-        ToolStripAction {                   // Land flight mode (direct, confirm dialog)
-            text:        qsTr("Land")
-            iconSource:  "/res/land.svg"
-            visible:     true
-            enabled:     !!QGroundControl.multiVehicleManager.activeVehicle
-            onTriggered: _root._commandFlightMode(qsTr("Land"))
-        },
-        ToolStripAction {                   // Hold flight mode (direct, confirm dialog)
-            text:        qsTr("Hold")
-            iconSource:  "/res/pause-mission.svg"
-            visible:     true
-            enabled:     !!QGroundControl.multiVehicleManager.activeVehicle
-            onTriggered: _root._commandFlightMode(qsTr("Hold"))
-        },
+        GuidedActionTakeoff { },            // STRATUM: MAV_CMD_NAV_TAKEOFF guided action (altitude dialog)
+        GuidedActionStandoffMode { },       // Standoff flight mode (hold-to-confirm)
+        GuidedActionLand { },               // Land flight mode
+        GuidedActionHold { },               // Hold flight mode
         GuidedActionAbort { },              // PX4 custom "Abort" flight mode (sub=22)
-        FlyViewDropperAction {
-            cameraMaximized:    _root.cameraMaximized
-            standoffController: _root.standoffController
-        },
         // STRATUM: PX4 custom "Engagement" flight mode (sub=21). Routed through the
         // engagement controller so the abort destination is armed (PARAM_SET) before commit.
         EngageAction {
@@ -94,6 +50,9 @@ ToolStripActionList {
                     QGroundControl.multiVehicleManager.activeVehicle.flightMode = qsTr("Vision Engagement")
                 }
             }
-        }
+        },
+        // STRATUM: Tracking on/off toggle -- enables/disables the already-running
+        // companion tracker via Vehicle.setTrackerEnabled(bool) (NEXAM_TRACKER_CONFIG 42005).
+        TrackingToggleAction { }
     ]
 }

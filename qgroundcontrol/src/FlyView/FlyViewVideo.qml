@@ -82,6 +82,33 @@ Item {
         videoHeight:             videoStreaming.getHeight()
     }
 
+    //-- STRATUM: operator visual target designation. Sends NEXAM_TARGET_SELECT on
+    //   click/drag and renders the tracked box streamed back by the companion. Works
+    //   without a MAVLink camera (the tracker lives on the companion computer).
+    TargetTrackingOverlay {
+        id:                      targetTrackingOverlay
+        anchors.fill:            parent
+        vehicle:                 QGroundControl.multiVehicleManager.activeVehicle
+        videoWidth:              videoStreaming.getWidth()
+        videoHeight:             videoStreaming.getHeight()
+    }
+
+    //-- STRATUM: tracker ROI-scoping overlay. Draws the outer ROI box the companion
+    //   tracker searches within and exposes a single diagonal-fraction control that
+    //   calls Vehicle::setTrackerRoi (NEXAM_TRACKER_CONFIG / 42005). Guards for a null
+    //   active vehicle internally (its _enabled check).
+    TrackerRoiOverlay {
+        id:                      trackerRoiOverlay
+        anchors.fill:            parent
+        // STRATUM: sit above flyViewVideoMouseArea (below) so the +/- ROI buttons receive
+        // clicks; the overlay's transparent areas still pass mouse events through to the
+        // designation MouseArea (a plain Item does not grab events).
+        z:                       20
+        vehicle:                 QGroundControl.multiVehicleManager.activeVehicle
+        videoWidth:              videoStreaming.getWidth()
+        videoHeight:             videoStreaming.getHeight()
+    }
+
     MouseArea {
         id:                         flyViewVideoMouseArea
         anchors.fill:               parent
@@ -105,10 +132,12 @@ Item {
                 _dragging = true
                 onScreenGimbalController.mouseDragStart(_pressX, _pressY)
                 cameraTrackingController.mouseDragStart(_pressX, _pressY)
+                targetTrackingOverlay.mouseDragStart(_pressX, _pressY)
             }
             if (_dragging) {
                 onScreenGimbalController.mouseDragPositionChanged(mouse.x, mouse.y)
                 cameraTrackingController.mouseDragPositionChanged(mouse.x, mouse.y)
+                targetTrackingOverlay.mouseDragPositionChanged(mouse.x, mouse.y)
             }
         }
 
@@ -116,9 +145,11 @@ Item {
             if (_dragging) {
                 onScreenGimbalController.mouseDragEnd()
                 cameraTrackingController.mouseDragEnd(mouse.x, mouse.y)
+                targetTrackingOverlay.mouseDragEnd(mouse.x, mouse.y)
             } else {
                 onScreenGimbalController.mouseClicked(mouse.x, mouse.y)
                 cameraTrackingController.mouseClicked(mouse.x, mouse.y)
+                targetTrackingOverlay.mouseClicked(mouse.x, mouse.y)
             }
             _dragging = false
         }

@@ -868,21 +868,7 @@ void *createVideoSink(QQuickItem * /*widget*/, QObject * /*parent*/)
     const bool forceCpu = vs->forceCpuVideoPath()->rawValue().toBool();
     const bool swDecoder = vs->forceVideoDecoder()->rawValue().toInt()
                            == GStreamer::ForceVideoDecoderSoftware;
-#if defined(Q_OS_WIN)
-    // STRATUM: force the CPU sink path on Windows. The only GPU zero-copy path here is
-    // D3D11/D3D12, whose importer creates one QRhi texture per GstMemory. Hardware H.264/
-    // H.265 decoders pack NV12 into a SINGLE GstMemory (both planes), so only the luma (Y)
-    // plane texture is created; the chroma (UV) plane is missing and Qt samples U=V=0,
-    // rendering every frame as a solid green screen. This is device-independent (a logic
-    // bug, not a driver quirk). The CPU branch (videoconvert -> appsink -> memcpy into a
-    // QVideoFrame) is correct, so route Windows through it until the D3D importer derives
-    // its plane count from the pixel format instead of gst_buffer_n_memory().
-    const bool gpuZeroCopy = false;
-    Q_UNUSED(forceCpu)
-    Q_UNUSED(swDecoder)
-#else
     const bool gpuZeroCopy = !forceCpu && !swDecoder;
-#endif
     if (GstElementFactory *factory = gst_element_factory_find("qgcvideosinkbin")) {
         videoSinkBin = gst_element_factory_create_full(factory,
                                                        "gpu-zerocopy", gpuZeroCopy ? TRUE : FALSE,

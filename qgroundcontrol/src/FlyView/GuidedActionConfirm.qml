@@ -80,25 +80,6 @@ Item {
         onTriggered:    _reallyShow()
     }
 
-    // STRATUM: the message-fade timer/animation live HERE (not in the host document) so
-    // that reset() and _reallyShow() can resolve them — a separate QML component cannot
-    // reach ids declared in FlyView.qml. They drive the (relocated) messageDisplay's
-    // opacity, which is why the animation targets the messageDisplay property.
-    PropertyAnimation {
-        id:         messageOpacityAnimation
-        target:     messageDisplay
-        property:   "opacity"
-        from:       1
-        to:         0
-        duration:   500
-    }
-
-    Timer {
-        id:             messageFadeTimer
-        interval:       4000
-        onTriggered:    messageOpacityAnimation.start()
-    }
-
     QGCPalette { id: qgcPal }
 
     RowLayout {

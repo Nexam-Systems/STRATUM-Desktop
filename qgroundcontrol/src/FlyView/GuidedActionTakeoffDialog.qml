@@ -21,6 +21,14 @@ QGCPopupDialog {
     property string _altUnits:          _unitsConversion.appSettingsVerticalDistanceUnitsString
     property real   _minAltitude:       _activeVehicle ? _unitsConversion.metersToAppSettingsVerticalDistanceUnits(_activeVehicle.minimumTakeoffAltitudeMeters()) : 0
 
+    // STRATUM: live echo of the altitude the operator has entered, clamped to the
+    // minimum, used by the confirmation sentence below so it always reflects the value
+    // that will actually be commanded (matching the onAccepted clamp logic).
+    property real   _enteredAltitude: {
+        var v = parseFloat(altitudeField.text)
+        return (isNaN(v) || v < _minAltitude) ? _minAltitude : v
+    }
+
     QGCPalette { id: qgcPal }
 
     onAccepted: {
@@ -55,6 +63,17 @@ QGCPopupDialog {
                 showUnits:          true
                 inputMethodHints:   Qt.ImhFormattedNumbersOnly
             }
+        }
+
+        // STRATUM: explicit, live confirmation sentence. Reflects the entered altitude
+        // (clamped to the minimum) so the operator sees exactly what will be commanded.
+        QGCLabel {
+            Layout.maximumWidth:    ScreenTools.defaultFontPixelWidth * 40
+            wrapMode:               Text.WordWrap
+            font.bold:              true
+            text:                   qsTr("Vehicle will take off to %1 %2.")
+                                        .arg(root._enteredAltitude.toFixed(1))
+                                        .arg(root._altUnits)
         }
 
         QGCLabel {

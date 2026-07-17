@@ -41,5 +41,50 @@
       <field type="uint8_t" name="tti_valid">1 if time_to_impact is a usable estimate, 0 otherwise.</field>
       <field type="uint8_t" name="track_quality">Track confidence 0..255 (255 = 1.0). 0 when no lock.</field>
     </message>
+    <!--
+      NEXAM_TARGET_SELECT / NEXAM_TARGET_TRACK: operator-in-the-loop visual target
+      designation loop between STRATUM (ground) and the companion tracker (mission
+      computer). SELECT travels down (GCS -> companion) when the operator draws/clicks
+      a box on the video; TRACK travels up (companion -> GCS) once per tracked frame so
+      STRATUM can render the moving box. Coordinates are normalized to the video frame
+      (0..1, origin top-left) so they are resolution-independent.
+
+      CRC parity: the field block below MUST stay byte-identical to nexam.xml shipped to
+      the companion's pymavlink build. CRC_EXTRA is a function of message name + each
+      field's type and name in wire-sorted order; identical blocks guarantee both ends
+      agree and frames are accepted rather than silently dropped. Do NOT reorder or
+      rename fields.
+    -->
+    <message id="42003" name="NEXAM_TARGET_SELECT">
+      <description>Operator visual target designation from the ground station to the companion tracker. Sent once when the operator selects (click or drag) a target on the live video.</description>
+      <field type="float" name="top_left_x">Selection box top-left X, normalized 0..1 (0 = left edge).</field>
+      <field type="float" name="top_left_y">Selection box top-left Y, normalized 0..1 (0 = top edge).</field>
+      <field type="float" name="bot_right_x">Selection box bottom-right X, normalized 0..1.</field>
+      <field type="float" name="bot_right_y">Selection box bottom-right Y, normalized 0..1.</field>
+      <field type="uint8_t" name="target_system">System id that should run the tracker (companion computer).</field>
+      <field type="uint8_t" name="target_component">Component id that should run the tracker (companion tracker).</field>
+      <field type="uint8_t" name="action">Selection action: 0=CANCEL (stop tracking), 1=SELECT (start tracking).</field>
+      <field type="uint8_t" name="target_id">Monotonic selection id, incremented on each new designation.</field>
+    </message>
+    <message id="42004" name="NEXAM_TARGET_TRACK">
+      <description>Tracked target state streamed from the companion tracker to the ground station, once per processed frame, so the operator sees the live tracked box on the video.</description>
+      <field type="float" name="top_left_x">Tracked box top-left X, normalized 0..1.</field>
+      <field type="float" name="top_left_y">Tracked box top-left Y, normalized 0..1.</field>
+      <field type="float" name="bot_right_x">Tracked box bottom-right X, normalized 0..1.</field>
+      <field type="float" name="bot_right_y">Tracked box bottom-right Y, normalized 0..1.</field>
+      <field type="float" name="confidence" invalid="NaN">Track confidence 0..1. NaN if not provided by the tracker.</field>
+      <field type="uint8_t" name="status">Tracker status: 0=IDLE, 1=TRACKING, 2=LOST.</field>
+      <field type="uint8_t" name="target_id">Selection id this track corresponds to.</field>
+    </message>
+    <message id="42005" name="NEXAM_TRACKER_CONFIG">
+      <description>Operator ROI-scoping and on/off configuration from the ground station to the companion tracker. Defines a centered region-of-interest (ROI) the tracker searches WITHIN before it emits a NEXAM_TARGET_TRACK box, and whether tracking is enabled at all. The ROI is a box centered at (roi_center_x, roi_center_y) whose size is expressed as roi_size, the ROI diagonal as a fraction of the full-frame diagonal. Unlike NEXAM_TARGET_SELECT this is not a target designation: it constrains the search region, it does not pick a target.</description>
+      <field type="float" name="roi_center_x">ROI center X, normalized 0..1 (0 = left edge). Default 0.5.</field>
+      <field type="float" name="roi_center_y">ROI center Y, normalized 0..1 (0 = top edge). Default 0.5.</field>
+      <field type="float" name="roi_size">ROI diagonal as a fraction of the full-frame diagonal, 0..1.</field>
+      <field type="uint8_t" name="target_system">System id that should run the tracker (companion computer).</field>
+      <field type="uint8_t" name="target_component">Component id that should run the tracker (companion tracker).</field>
+      <field type="uint8_t" name="enable">Tracking enable: 0 = tracking disabled, 1 = enabled.</field>
+      <field type="uint8_t" name="target_id">Reserved/monotonic config id, incremented on each update (kept for symmetry with the other NEXAM messages).</field>
+    </message>
   </messages>
 </mavlink>

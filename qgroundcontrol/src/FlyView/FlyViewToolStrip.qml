@@ -17,8 +17,6 @@ ToolStrip {
 
     property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     property var engagementController    // STRATUM: forwarded to the Engage trigger
-    property bool cameraMaximized: false // STRATUM: forwarded to the dropper's camera section
-    property var standoffController      // STRATUM: forwarded to the dropper's drop safety check
 
     QGCPalette { id: qgcPal }
 
@@ -44,8 +42,6 @@ ToolStrip {
         id: flyViewToolStripActionList
 
         engagementController:        _root.engagementController
-        cameraMaximized:             _root.cameraMaximized
-        standoffController:          _root.standoffController
         onDisplayPreFlightChecklist: _root.displayPreFlightChecklist()
         onDefineAOP:                 _root.defineAOP()
         onSetStandoff:               _root.setStandoff()
