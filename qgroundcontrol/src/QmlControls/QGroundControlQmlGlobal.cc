@@ -10,6 +10,7 @@
 #include "PositionManager.h"
 #include "QGCMapEngineManager.h"
 #include "ADSBVehicleManager.h"
+#include "TargetFetchManager.h"
 #include "AudioOutput.h"
 #include "NTRIPManager.h"
 #include "MAVLinkSigningKeys.h"
@@ -41,6 +42,7 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     : QObject(parent)
     , _mapEngineManager(QGCMapEngineManager::instance())
     , _adsbVehicleManager(ADSBVehicleManager::instance())
+    , _targetFetchManager(TargetFetchManager::instance())
     , _ntripManager(NTRIPManager::instance())
     , _qgcPositionManager(QGCPositionManager::instance())
     , _missionCommandTree(MissionCommandTree::instance())

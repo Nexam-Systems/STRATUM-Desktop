@@ -872,6 +872,16 @@ FlightMap {
         markerLabel:    qsTr("Target")
     }
 
+    // STRATUM: XC25 fetched-target marker. Plotted on demand by the "Fetch Target"
+    // tool-strip button (QGroundControl.targetFetch), independent of the standoff
+    // command above. Blue to distinguish it from the crimson standoff target.
+    StandoffTargetMarker {
+        coordinate:     QGroundControl.targetFetch.targetCoordinate
+        visible:        QGroundControl.targetFetch.targetValid && QGroundControl.targetFetch.targetCoordinate.isValid
+        markerColor:    "#1E88E5"
+        markerLabel:    qsTr("XC25 Target")
+    }
+
     QGCPopupDialogFactory {
         id: roiEditPositionDialogFactory
 

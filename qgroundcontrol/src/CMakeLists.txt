@@ -35,6 +35,7 @@ endif()
 
 # Core subsystems
 add_subdirectory(ADSB)
+add_subdirectory(TargetFetch)   # STRATUM: relayed XC25 target coordinate -> map marker
 add_subdirectory(AnalyzeView)
 add_subdirectory(API)
 add_subdirectory(AutoPilotPlugins)

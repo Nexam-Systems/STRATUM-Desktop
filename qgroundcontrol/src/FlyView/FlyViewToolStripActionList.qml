@@ -53,6 +53,11 @@ ToolStripActionList {
         },
         // STRATUM: Tracking on/off toggle -- enables/disables the already-running
         // companion tracker via Vehicle.setTrackerEnabled(bool) (NEXAM_TRACKER_CONFIG 42005).
-        TrackingToggleAction { }
+        TrackingToggleAction { },
+        // STRATUM: Fetch the XC25 pod's designated target (relayed from the camera GCS)
+        // and plot it on the map. One-shot: each press plots the latest coordinate.
+        FetchTargetAction {
+            onTriggered: QGroundControl.targetFetch.fetchTarget()
+        }
     ]
 }
