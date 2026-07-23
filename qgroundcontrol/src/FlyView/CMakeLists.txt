@@ -17,6 +17,7 @@ qt_add_qml_module(FlyViewModule
         EngagementAbortOverlay.qml
         EngagementController.qml
         EngagementCountdown.qml
+        ConnectPodAction.qml
         FetchTargetAction.qml
         VisionEngageAction.qml
         VisionEngagementOverlay.qml
