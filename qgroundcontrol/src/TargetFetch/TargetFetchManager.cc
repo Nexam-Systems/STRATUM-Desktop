@@ -4,6 +4,7 @@
 
 #include <QtCore/QApplicationStatic>
 #include <QtCore/QDateTime>
+#include <QtCore/QTimer>
 #include <QtNetwork/QHostAddress>
 #include <QtNetwork/QUdpSocket>
 
@@ -50,6 +51,11 @@ TargetFetchManager::TargetFetchManager(QObject *parent)
         qCWarning(TargetFetchLog) << "Failed to bind UDP" << kListenPort << ":" << _socket->errorString();
         _setStatus(tr("Cannot open UDP %1: %2").arg(kListenPort).arg(_socket->errorString()));
     }
+
+    _fetchTimer = new QTimer(this);
+    _fetchTimer->setInterval(kFetchIntervalMs);
+    _fetchTimer->setSingleShot(false);
+    (void) connect(_fetchTimer, &QTimer::timeout, this, &TargetFetchManager::_onFetchTick);
 }
 
 TargetFetchManager::~TargetFetchManager() = default;
@@ -128,6 +134,25 @@ void TargetFetchManager::_decodeT1(const quint8 *body)
 
 void TargetFetchManager::fetchTarget()
 {
+    // Start a fresh session: fetch now, then every kFetchIntervalMs for the duration.
+    _fetchTicks = 0;
+    _sessionFailShown = false;
+    _doFetch();
+    _fetchTimer->start();
+}
+
+void TargetFetchManager::_onFetchTick()
+{
+    ++_fetchTicks;
+    _doFetch();
+    if (_fetchTicks >= kFetchMaxTicks) {
+        _fetchTimer->stop();
+        qCDebug(TargetFetchLog) << "fetch session complete (" << (_fetchTicks + 1) << "fetches)";
+    }
+}
+
+void TargetFetchManager::_doFetch()
+{
     const qint64 age = QDateTime::currentMSecsSinceEpoch() - _liveRxMs;
     if (!_liveValid || (age > kFreshnessMs)) {
         // Point at the exact break in the chain so it is easy to diagnose.
@@ -147,13 +172,19 @@ void TargetFetchManager::fetchTarget()
                       .arg(age / 1000);
         }
         _setStatus(why);
-        qCDebug(TargetFetchLog) << "fetchTarget failed:" << why
+        qCDebug(TargetFetchLog) << "fetch failed:" << why
                                 << "| datagrams" << _datagrams << "statusFrames" << _statusFrames
                                 << "liveValid" << _liveValid << "age" << age;
-        QGC::showAppMessage(_statusText);
+        if (!_sessionFailShown) {           // avoid a popup every 2 s
+            QGC::showAppMessage(why);
+            _sessionFailShown = true;
+        }
         return;
     }
 
+    // Remove the previous marker, then plot the new one.
+    _targetValid = false;
+    emit targetChanged();
     _targetCoordinate = _liveTarget;
     _targetValid = true;
     emit targetChanged();
@@ -166,6 +197,9 @@ void TargetFetchManager::fetchTarget()
 
 void TargetFetchManager::clearTarget()
 {
+    if (_fetchTimer) {
+        _fetchTimer->stop();
+    }
     if (_targetValid) {
         _targetValid = false;
         emit targetChanged();

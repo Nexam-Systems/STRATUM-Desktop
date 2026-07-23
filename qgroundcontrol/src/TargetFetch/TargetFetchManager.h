@@ -5,6 +5,7 @@
 #include <QtPositioning/QGeoCoordinate>
 
 class QUdpSocket;
+class QTimer;
 
 /// STRATUM: TargetFetch
 ///
@@ -32,9 +33,10 @@ public:
     bool           targetValid() const      { return _targetValid; }
     QString        statusText() const       { return _statusText; }
 
-    /// Plot the most-recent target coordinate received from the relay (one-shot).
+    /// Start a fetch session: plots the target now, then re-fetches every 2 s for
+    /// 30 s, replacing the marker each time. Clicking again restarts the session.
     Q_INVOKABLE void fetchTarget();
-    /// Remove the plotted target marker.
+    /// Remove the plotted target marker (and stop any running session).
     Q_INVOKABLE void clearTarget();
 
 signals:
@@ -43,10 +45,12 @@ signals:
 
 private slots:
     void _readPendingDatagrams();
+    void _onFetchTick();
 
 private:
     void _scan(const QByteArray &datagram);
     void _decodeT1(const quint8 *body);
+    void _doFetch();
     void _setStatus(const QString &text);
 
     QUdpSocket    *_socket = nullptr;
@@ -60,8 +64,14 @@ private:
     quint64        _datagrams    = 0;              // UDP datagrams received from the relay
     quint64        _statusFrames = 0;              // valid 0x40 status frames decoded
 
+    QTimer        *_fetchTimer   = nullptr;        // drives the repeating fetch session
+    int            _fetchTicks   = 0;              // ticks elapsed in the current session
+    bool           _sessionFailShown = false;      // show the "why failed" popup once/session
+
     QString        _statusText;
 
-    static constexpr quint16 kListenPort  = 45400; // must match the relay's forward_port
-    static constexpr qint64  kFreshnessMs = 5000;  // a live target older than this is stale
+    static constexpr quint16 kListenPort   = 45400; // must match the relay's forward_port
+    static constexpr qint64  kFreshnessMs  = 5000;  // a live target older than this is stale
+    static constexpr int     kFetchIntervalMs = 2000;  // re-fetch every 2 s
+    static constexpr int     kFetchMaxTicks   = 15;    // 15 ticks x 2 s = 30 s (+ immediate)
 };
