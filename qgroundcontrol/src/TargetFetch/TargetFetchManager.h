@@ -87,4 +87,6 @@ private:
     bool           _sessionFailShown = false;
     int            _pingTicks    = 0;
     bool           _pinging      = false;
+
+    QString        _statusText;
 };
