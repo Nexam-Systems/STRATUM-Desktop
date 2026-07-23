@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QtCore/QObject>
+#include <QtCore/QByteArray>
 #include <QtCore/QString>
+#include <QtNetwork/QHostAddress>
 #include <QtPositioning/QGeoCoordinate>
 
 class QUdpSocket;
@@ -9,12 +11,14 @@ class QTimer;
 
 /// STRATUM: TargetFetch
 ///
-/// Receives the XC25 electro-optical pod's status stream (the TS-protocol 0x40 /
-/// T1 packet, which carries the laser-designated TARGET coordinate). The pod
-/// unicasts its status only to the camera-control GCS; a small relay on that
-/// machine forwards a copy here over UDP. This class is READ-ONLY - it never
-/// transmits to the pod or the vehicle. On demand (fetchTarget()) it publishes
-/// the most-recent target coordinate so the Fly view map can plot a marker.
+/// Fetches the XC25 pod's designated TARGET coordinate and plots it on the map.
+///
+/// It talks to the pod DIRECTLY (no external relay): during a fetch session it
+/// streams a minimal AHRS/M heartbeat to the pod (combo = 0, so it does NOT
+/// overwrite the attitude/GPS the real controller is feeding) which makes the pod
+/// stream its status back to this machine, then it decodes the TS 0x40 / T1 packet
+/// for the target. On "Fetch Target" it runs for 30 s, re-fetching every 2 s and
+/// replacing the marker each time.
 class TargetFetchManager : public QObject
 {
     Q_OBJECT
@@ -33,10 +37,9 @@ public:
     bool           targetValid() const      { return _targetValid; }
     QString        statusText() const       { return _statusText; }
 
-    /// Start a fetch session: plots the target now, then re-fetches every 2 s for
-    /// 30 s, replacing the marker each time. Clicking again restarts the session.
+    /// Start a 30 s fetch session (re-fetches every 2 s, replaces the marker).
     Q_INVOKABLE void fetchTarget();
-    /// Remove the plotted target marker (and stop any running session).
+    /// Remove the plotted target marker and stop the session.
     Q_INVOKABLE void clearTarget();
 
 signals:
@@ -46,6 +49,7 @@ signals:
 private slots:
     void _readPendingDatagrams();
     void _onFetchTick();
+    void _sendHeartbeat();
 
 private:
     void _scan(const QByteArray &datagram);
@@ -53,25 +57,21 @@ private:
     void _doFetch();
     void _setStatus(const QString &text);
 
-    QUdpSocket    *_socket = nullptr;
+    QUdpSocket    *_socket          = nullptr;
+    QTimer        *_fetchTimer      = nullptr;   // drives the 2 s re-fetch
+    QTimer        *_heartbeatTimer  = nullptr;   // pokes the pod so it streams to us
+    QByteArray     _heartbeat;                   // pre-built M/AHRS heartbeat (combo=0)
+    QHostAddress   _podAddr;
 
-    QGeoCoordinate _targetCoordinate;              // plotted marker (updated on fetch)
-    bool           _targetValid = false;
+    QGeoCoordinate _targetCoordinate;            // plotted marker (updated on fetch)
+    bool           _targetValid  = false;
 
-    QGeoCoordinate _liveTarget;                    // latest target seen on the stream
-    bool           _liveValid   = false;
-    qint64         _liveRxMs    = 0;               // arrival time of the latest live target
-    quint64        _datagrams    = 0;              // UDP datagrams received from the relay
-    quint64        _statusFrames = 0;              // valid 0x40 status frames decoded
+    QGeoCoordinate _liveTarget;                  // latest target seen on the stream
+    bool           _liveValid    = false;
+    qint64         _liveRxMs     = 0;
+    quint64        _datagrams    = 0;            // datagrams received from the pod
+    quint64        _statusFrames = 0;            // valid 0x40 status frames decoded
 
-    QTimer        *_fetchTimer   = nullptr;        // drives the repeating fetch session
-    int            _fetchTicks   = 0;              // ticks elapsed in the current session
-    bool           _sessionFailShown = false;      // show the "why failed" popup once/session
-
-    QString        _statusText;
-
-    static constexpr quint16 kListenPort   = 45400; // must match the relay's forward_port
-    static constexpr qint64  kFreshnessMs  = 5000;  // a live target older than this is stale
-    static constexpr int     kFetchIntervalMs = 2000;  // re-fetch every 2 s
-    static constexpr int     kFetchMaxTicks   = 15;    // 15 ticks x 2 s = 30 s (+ immediate)
+    int            _fetchTicks   = 0;
+    bool           _sessionFailShown = false;
 };
