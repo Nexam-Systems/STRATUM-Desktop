@@ -57,6 +57,8 @@ private:
     QGeoCoordinate _liveTarget;                    // latest target seen on the stream
     bool           _liveValid   = false;
     qint64         _liveRxMs    = 0;               // arrival time of the latest live target
+    quint64        _datagrams    = 0;              // UDP datagrams received from the relay
+    quint64        _statusFrames = 0;              // valid 0x40 status frames decoded
 
     QString        _statusText;
 

@@ -66,6 +66,10 @@ void TargetFetchManager::_readPendingDatagrams()
         datagram.resize(static_cast<int>(_socket->pendingDatagramSize()));
         const qint64 read = _socket->readDatagram(datagram.data(), datagram.size());
         if (read > 0) {
+            if (_datagrams == 0) {
+                qCDebug(TargetFetchLog) << "first relayed datagram received (" << read << "bytes)";
+            }
+            ++_datagrams;
             datagram.truncate(static_cast<int>(read));
             _scan(datagram);
         }
@@ -85,6 +89,7 @@ void TargetFetchManager::_scan(const QByteArray &datagram)
                 const int csPos = i + 2 + ln;                    // checksum byte
                 if (b[i + 4] == kFrameStatus &&
                     xorSum(&b[i + 3], csPos - (i + 3)) == b[csPos]) {
+                    ++_statusFrames;
                     const int bodyStart = i + 5;                 // T1 = first 22 body bytes
                     if (bodyStart + 22 <= n) {
                         _decodeT1(&b[bodyStart]);
@@ -125,8 +130,26 @@ void TargetFetchManager::fetchTarget()
 {
     const qint64 age = QDateTime::currentMSecsSinceEpoch() - _liveRxMs;
     if (!_liveValid || (age > kFreshnessMs)) {
-        _setStatus(tr("No current XC25 target - check the relay is running and the pod has a target/GPS fix."));
-        qCDebug(TargetFetchLog) << "fetchTarget: no fresh target (liveValid" << _liveValid << "age" << age << "ms)";
+        // Point at the exact break in the chain so it is easy to diagnose.
+        QString why;
+        if (_datagrams == 0) {
+            why = tr("No data on UDP %1. Check XC25_TargetRelay is running (as Administrator) "
+                     "with forward_ip set to this PC, and that this PC's firewall allows inbound "
+                     "UDP %1.").arg(kListenPort);
+        } else if (_statusFrames == 0) {
+            why = tr("Receiving %1 packets on UDP %2 but none are valid pod status frames.")
+                      .arg(_datagrams).arg(kListenPort);
+        } else if (!_liveValid) {
+            why = tr("Receiving pod status, but no target is designated yet "
+                     "(the pod's target reads 0,0 - needs a laser/GPS target).");
+        } else {
+            why = tr("Last target is stale (%1 s old) - is the relay still forwarding?")
+                      .arg(age / 1000);
+        }
+        _setStatus(why);
+        qCDebug(TargetFetchLog) << "fetchTarget failed:" << why
+                                << "| datagrams" << _datagrams << "statusFrames" << _statusFrames
+                                << "liveValid" << _liveValid << "age" << age;
         QGC::showAppMessage(_statusText);
         return;
     }
