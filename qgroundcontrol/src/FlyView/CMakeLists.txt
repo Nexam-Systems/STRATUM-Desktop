@@ -112,4 +112,5 @@ qt_add_resources(FlyViewModule flyview_qmlimages
     BASE "${CMAKE_SOURCE_DIR}/resources"
     FILES
         "${CMAKE_SOURCE_DIR}/resources/check.svg"
+        "${CMAKE_SOURCE_DIR}/resources/TargetLocation.svg"
 )
