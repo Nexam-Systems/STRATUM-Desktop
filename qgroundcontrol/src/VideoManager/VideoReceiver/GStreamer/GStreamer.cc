@@ -868,7 +868,19 @@ void *createVideoSink(QQuickItem * /*widget*/, QObject * /*parent*/)
     const bool forceCpu = vs->forceCpuVideoPath()->rawValue().toBool();
     const bool swDecoder = vs->forceVideoDecoder()->rawValue().toInt()
                            == GStreamer::ForceVideoDecoderSoftware;
-    const bool gpuZeroCopy = !forceCpu && !swDecoder;
+    bool gpuZeroCopy = !forceCpu && !swDecoder;
+#if defined(Q_OS_WIN)
+    // The Windows D3D11/D3D12 zero-copy path is unvalidated on real hardware (see the
+    // "UNTESTED on Windows hardware" note in GstD3D11VideoBuffer.cc). It renders all-zero
+    // frames — which decode to a solid green picture — whenever the shared-device
+    // GstD3D11ContextBridge loses the NEED_CONTEXT race (textures end up on an isolated
+    // device QRhi can't sample) or a single-texture NV12 buffer's chroma plane isn't
+    // imported. Route Windows through the proven videoconvert->appsink CPU path instead.
+    // Every other platform (Linux DMABuf/GLMemory, macOS IOSurface, Android AHardwareBuffer)
+    // keeps zero-copy. forceCpuVideoPath still works everywhere; this only pins the Windows
+    // default until the D3D zero-copy path is fixed and validated on hardware.
+    gpuZeroCopy = false;
+#endif
     if (GstElementFactory *factory = gst_element_factory_find("qgcvideosinkbin")) {
         videoSinkBin = gst_element_factory_create_full(factory,
                                                        "gpu-zerocopy", gpuZeroCopy ? TRUE : FALSE,
