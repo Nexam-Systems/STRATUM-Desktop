@@ -41,7 +41,14 @@ enum PX4_CUSTOM_SUB_MODE_AUTO {
 	// STRATUM: append-only, kept in lock-step with firmware ordering so ABORT resolves to 22.
 	PX4_CUSTOM_SUB_MODE_AUTO_ABORT,            // 22
 	// STRATUM: append-only, kept in lock-step with firmware ordering so VISION_ENGAGEMENT resolves to 23.
-	PX4_CUSTOM_SUB_MODE_AUTO_VISION_ENGAGEMENT // 23
+	PX4_CUSTOM_SUB_MODE_AUTO_VISION_ENGAGEMENT, // 23
+	// STRATUM: append-only, kept in lock-step with firmware ordering so PN_ENGAGEMENT resolves to 24.
+	// Firmware side: src/modules/commander/px4_custom_mode.h, PX4_CUSTOM_SUB_MODE_PN_ENGAGEMENT = 24,
+	// which Commander maps to vehicle_status_s::NAVIGATION_STATE_PN_ENGAGEMENT = 30. Note that 30 is
+	// the former EXTERNAL8 slot: the mode_req_* bitfield in FailsafeFlags.msg is uint32, so nav_states
+	// 0-31 exhaust it and there was no free slot to allocate. The sub-mode number and the nav_state
+	// number are therefore NOT related, and neither is derivable from the other.
+	PX4_CUSTOM_SUB_MODE_AUTO_PN_ENGAGEMENT     // 24
 };
 
 enum PX4_CUSTOM_SUB_MODE_POSCTL {
@@ -87,5 +94,6 @@ struct PX4CustomMode{
         AUTO_ENGAGEMENT     = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_ENGAGEMENT    << 24 ),
         AUTO_ABORT          = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_ABORT         << 24 ),
         AUTO_VISION_ENGAGEMENT = PX4_CUSTOM_MAIN_MODE_AUTO      <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_VISION_ENGAGEMENT << 24 ),
+        AUTO_PN_ENGAGEMENT  = PX4_CUSTOM_MAIN_MODE_AUTO         <<16 | (PX4_CUSTOM_SUB_MODE_AUTO_PN_ENGAGEMENT    << 24 ),
     };
 };

@@ -18,6 +18,7 @@ Item {
     property var missionController
     property var confirmDialog
     property var guidedValueSlider
+    property var engagementController    // STRATUM: engagement/abort safety-loop controller
     property var fwdFlightGotoMapCircle
     property var orbitMapCircle
 
@@ -49,6 +50,7 @@ Item {
     readonly property string setEstimatorOriginTitle:       qsTr("Set Estimator Origin")
     readonly property string setFlightMode:                 qsTr("Set Flight Mode")
     readonly property string changeHeadingTitle:            qsTr("Change Heading")
+    readonly property string pnEngageTitle:                 qsTr("PN ENGAGE")   // STRATUM
 
     readonly property string armMessage:                        qsTr("Arm the vehicle.")
     readonly property string mvArmMessage:                      qsTr("Arm selected vehicles.")
@@ -78,6 +80,14 @@ Item {
     readonly property string setEstimatorOriginMessage:         qsTr("Make the specified location the estimator origin")
     readonly property string setFlightModeMessage:              qsTr("Set the vehicle flight mode to %1").arg(_actionData)
     readonly property string changeHeadingMessage:              qsTr("Set the vehicle heading towards the specified location")
+    // STRATUM: PN-ENG is a committed terminal guidance run, so it gets its own action
+    // code rather than riding actionSetFlightMode. Two reasons, and the second is the
+    // load-bearing one. First, the confirmation text must state what is about to happen
+    // rather than reading "Set the vehicle flight mode to PN Engagement". Second, the
+    // execution path must go through EngagementController.pnEngage() so the abort
+    // destination is pushed (PARAM_SET) BEFORE the mode switch; actionSetFlightMode
+    // assigns Vehicle.flightMode directly and would bypass that arming silently.
+    readonly property string pnEngageMessage:                    qsTr("Commit to a PN terminal guidance run. The abort destination is armed before the mode is commanded. The vehicle will hold if its entry gate (LOS depression, range, speed) is not satisfied.")
 
     readonly property int actionRTL:                        1
     readonly property int actionLand:                       2
@@ -108,6 +118,7 @@ Item {
     readonly property int actionMVArm:                      28
     readonly property int actionMVDisarm:                   29
     readonly property int actionChangeLoiterRadius:         30
+    readonly property int actionPnEngage:                   31  // STRATUM: PN Engagement (custom sub_mode 24 -> nav_state 30)
 
     readonly property int customActionStart:                10000 // Custom actions ids should start here so that they don't collide with the built in actions
 
@@ -567,6 +578,10 @@ Item {
             confirmDialog.title = changeHeadingTitle
             confirmDialog.message = changeHeadingMessage
             break
+        case actionPnEngage:                                    // STRATUM
+            confirmDialog.title = pnEngageTitle
+            confirmDialog.message = pnEngageMessage
+            break
         default:
             if (!customController.customConfirmAction(actionCode, actionData, mapIndicator, confirmDialog)) {
                 console.warn("Unknown actionCode", actionCode)
@@ -710,6 +725,19 @@ Item {
             break
         case actionChangeHeading:
             _activeVehicle.guidedModeChangeHeading(actionData)
+            break
+        case actionPnEngage:
+            // STRATUM: route through the engagement controller so _ensureArmed() pushes
+            // the ABRT_* destination before the mode is commanded. The fallback exists so
+            // a FlyView that has not wired the controller still commands the mode rather
+            // than doing nothing, but it is a DEGRADED path: no abort destination is
+            // guaranteed, so it is logged.
+            if (engagementController) {
+                engagementController.pnEngage()
+            } else {
+                console.warn("GuidedActionsController: no engagementController; commanding PN Engagement WITHOUT arming an abort destination")
+                _activeVehicle.flightMode = qsTr("PN Engagement")
+            }
             break
         default:
             if (!customController.customExecuteAction(actionCode, actionData, sliderOutputValue, optionChecked)) {

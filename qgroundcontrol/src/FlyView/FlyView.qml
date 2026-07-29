@@ -152,6 +152,10 @@ Item {
             id:                 guidedActionsController
             missionController:  _missionController
             guidedValueSlider:     _guidedValueSlider
+            // STRATUM: required by actionPnEngage so the abort destination is armed
+            // before PN Engagement is commanded. Without this binding the controller
+            // falls back to a direct mode set with no abort destination guaranteed.
+            engagementController:  engagementController
         }
 
         //-- Guided value slider (e.g. altitude)

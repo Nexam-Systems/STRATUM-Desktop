@@ -32,9 +32,14 @@ MapQuickItem {
     // strip accent) and Toolbar/FlyViewToolBar.qml (ribbon). Abort -> amber, Engagement
     // -> red, flying / takeoff / hold / standoff -> green, on the ground -> blue. ADSB
     // traffic is never tinted.
+    // All three engagement modes share the red tint: the colour encodes "committed to a
+    // terminal run", not which guidance law is running. Vision Engagement was previously
+    // absent here and tinted green; it is added together with PN Engagement.
     property color  _stateTintColor:    (_adsbVehicle || !vehicle) ? "transparent" :
                                             vehicle.flightMode === qsTr("Abort") ? "#F59E0B" :
-                                            vehicle.flightMode === qsTr("Engagement") ? "#DC2626" :
+                                            (vehicle.flightMode === qsTr("Engagement") ||
+                                             vehicle.flightMode === qsTr("Vision Engagement") ||
+                                             vehicle.flightMode === qsTr("PN Engagement")) ? "#DC2626" :
                                             (vehicle.flightMode === qsTr("Standoff") ||
                                              vehicle.flightMode === qsTr("Takeoff") ||
                                              vehicle.flightMode === vehicle.pauseFlightMode ||

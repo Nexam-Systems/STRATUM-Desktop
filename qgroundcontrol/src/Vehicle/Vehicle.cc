@@ -21,6 +21,7 @@
 #include "VehicleVibrationFactGroup.h"
 #include "VehicleEngagementStatusFactGroup.h"   // STRATUM
 #include "VehicleVisionEngagementStatusFactGroup.h"   // STRATUM
+#include "VehiclePnEngagementStatusFactGroup.h"   // STRATUM
 #include "VehicleTargetTrackFactGroup.h"   // STRATUM
 #include "VehicleWindFactGroup.h"
 #include "VehicleSupports.h"
@@ -318,6 +319,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _vibrationFactGroup             = new VehicleVibrationFactGroup(this);
     _engagementStatusFactGroup      = new VehicleEngagementStatusFactGroup(this);   // STRATUM
     _visionEngagementStatusFactGroup = new VehicleVisionEngagementStatusFactGroup(this);   // STRATUM
+    _pnEngagementStatusFactGroup    = new VehiclePnEngagementStatusFactGroup(this);   // STRATUM
     _targetTrackFactGroup           = new VehicleTargetTrackFactGroup(this);   // STRATUM
     _temperatureFactGroup           = new VehicleTemperatureFactGroup(this);
     _clockFactGroup                 = new VehicleClockFactGroup(this);
@@ -355,6 +357,7 @@ void Vehicle::_commonInit(LinkInterface* link)
     _addFactGroup(_vibrationFactGroup,         _vibrationFactGroupName);
     _addFactGroup(_engagementStatusFactGroup,  _engagementStatusFactGroupName);   // STRATUM
     _addFactGroup(_visionEngagementStatusFactGroup, _visionEngagementStatusFactGroupName);   // STRATUM
+    _addFactGroup(_pnEngagementStatusFactGroup, _pnEngagementStatusFactGroupName);   // STRATUM
     _addFactGroup(_targetTrackFactGroup,       _targetTrackFactGroupName);   // STRATUM
     _addFactGroup(_temperatureFactGroup,       _temperatureFactGroupName);
     _addFactGroup(_clockFactGroup,             _clockFactGroupName);
@@ -424,6 +427,7 @@ FactGroup* Vehicle::windFactGroup()                 { return _windFactGroup; }
 FactGroup* Vehicle::vibrationFactGroup()            { return _vibrationFactGroup; }
 FactGroup* Vehicle::engagementStatusFactGroup()     { return _engagementStatusFactGroup; }   // STRATUM
 FactGroup* Vehicle::visionEngagementStatusFactGroup() { return _visionEngagementStatusFactGroup; }   // STRATUM
+FactGroup* Vehicle::pnEngagementStatusFactGroup()   { return _pnEngagementStatusFactGroup; }   // STRATUM
 FactGroup* Vehicle::targetTrackFactGroup()          { return _targetTrackFactGroup; }   // STRATUM
 FactGroup* Vehicle::temperatureFactGroup()          { return _temperatureFactGroup; }
 FactGroup* Vehicle::clockFactGroup()                { return _clockFactGroup; }

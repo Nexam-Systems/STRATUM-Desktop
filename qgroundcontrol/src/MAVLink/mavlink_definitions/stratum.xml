@@ -86,5 +86,43 @@
       <field type="uint8_t" name="enable">Tracking enable: 0 = tracking disabled, 1 = enabled.</field>
       <field type="uint8_t" name="target_id">Reserved/monotonic config id, incremented on each update (kept for symmetry with the other NEXAM messages).</field>
     </message>
+    <!--
+      PN_ENGAGEMENT_STATUS: diagnostic egress for the PN-ENG terminal guidance mode
+      (NAVIGATION_STATE_PN_ENGAGEMENT, nav_state 30; MAVLink custom sub-mode 24).
+
+      Why it exists. PN-ENG enforces a relational entry gate (PNE_GATE_LOS, _RMIN,
+      _RMAX, _VMAX). On rejection the mode commands zero inertial acceleration, which
+      on the ground station is indistinguishable from a hold: the operator commands PN,
+      the aircraft holds, and the only evidence is a transient status-text line. This
+      message makes the verdict a first-class telemetry item, and carries the actuator
+      authority margin (u_mag against u_min) whose breach produced the terminal
+      departures reconstructed from logs 390 and 391.
+
+      CRC parity: the field block below MUST stay byte-identical to the PX4 firmware
+      definition in src/modules/mavlink/mavlink/message_definitions/v1.0/development.xml.
+      Do NOT reorder or rename fields. The eight boolean fields of the pn_engagement_status
+      uORB topic are packed into the single uint16 `flags` field so that new flags can be
+      added by claiming a reserved bit rather than by changing the wire format; bits are
+      append-only, and the assignment is mirrored in VehiclePnEngagementStatusFactGroup.
+      The three-element acceleration vectors of the uORB topic are deliberately NOT
+      relayed: they are post-flight reconstruction data and belong in the log.
+    -->
+    <message id="42006" name="PN_ENGAGEMENT_STATUS">
+      <description>PN-ENG terminal guidance status. Carries the entry-gate verdict, the line-of-sight solution, and the actuator-authority margin for the proportional-navigation engagement mode, so the ground station can display an abort countdown and distinguish a gate reject from a lost target.</description>
+      <field type="float" name="range" units="m" invalid="NaN">Slant range from the vehicle to the target. NaN if no valid target solution.</field>
+      <field type="float" name="horiz_range" units="m" invalid="NaN">Horizontal range to the target. This is the quantity the entry gate tests against PNE_GATE_RMIN/RMAX.</field>
+      <field type="float" name="closing_speed" units="m/s" invalid="NaN">Closing speed V_c along the line of sight, positive when closing. The PN term is gated off when this is not positive.</field>
+      <field type="float" name="los_bearing" units="rad" invalid="NaN">Line-of-sight bearing from the vehicle to the target, 0 = North, clockwise positive.</field>
+      <field type="float" name="los_elevation" units="rad" invalid="NaN">Line-of-sight depression below the horizon, positive down. Tested against PNE_GATE_LOS at entry.</field>
+      <field type="float" name="time_to_impact" units="s" invalid="NaN">Estimated time until intercept. NaN if not estimable, which is the normal case before the closing-speed regulator has converged.</field>
+      <field type="float" name="u_mag" units="m/s/s" invalid="NaN">Specific thrust magnitude ||a_des - g|| the mode is demanding.</field>
+      <field type="float" name="u_min" units="m/s/s" invalid="NaN">Authority floor at the current airspeed. When u_mag falls below this the allocator loses control margin; this is the quantity whose breach produced the terminal departures in logs 390/391.</field>
+      <field type="float" name="collective_pred" invalid="NaN">Predicted normalised collective, MPC_THR_HOVER * u_mag / g0. Approaching zero means the motors are about to clip.</field>
+      <field type="float" name="tilt" units="rad" invalid="NaN">Predicted thrust-axis tilt from vertical. Bounded by PNE_TILT_MAX. This is the thrust axis, not the pitch attitude.</field>
+      <field type="float" name="v_horiz" units="m/s" invalid="NaN">Horizontal speed. Below PNE_VH_MIN while descending faster than PNE_VZ_VRS the vortex-ring-state guard arms.</field>
+      <field type="float" name="v_des_eff" units="m/s" invalid="NaN">Effective commanded closing speed after the entry ramp and the VRS guard have been applied to PNE_V_DES.</field>
+      <field type="uint16_t" name="flags">Status bitmask. Bit 0: target solution valid this cycle. Bit 1: entry gate satisfied. Bit 2: terminal freeze latched (committed). Bit 3: authority floor exceeds what the airframe can produce. Bit 4: VRS guard active. Bit 5: PN command clamped by PNE_MAX_G. Bit 6: tilt clamped by PNE_TILT_MAX. Bit 7: authority floor scale-up active. Bits 8-15 reserved, send 0.</field>
+      <field type="uint8_t" name="state">PN-ENG state: 0=INACTIVE, 1=GATE_REJECT (entry gate not satisfied, holding hover), 2=GUIDING, 3=TERMINAL (inside PNE_R_MIN, guidance frozen), 4=RECOVER (target solution lost, holding hover).</field>
+    </message>
   </messages>
 </mavlink>

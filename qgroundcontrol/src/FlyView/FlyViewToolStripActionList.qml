@@ -51,6 +51,13 @@ ToolStripActionList {
                 }
             }
         },
+        // STRATUM: PX4 custom "PN Engagement" flight mode (sub=24 -> nav_state 30) --
+        // proportional navigation plus a closing-speed regulator against the LATCHED
+        // standoff target. Unlike Engage and Vision above this is a hold-to-confirm
+        // action (GuidedActionPnEngage -> actionPnEngage), which still reaches
+        // EngagementController.pnEngage() and therefore still arms the abort
+        // destination; see the header of GuidedActionPnEngage.qml.
+        GuidedActionPnEngage { },
         // STRATUM: Tracking on/off toggle -- enables/disables the already-running
         // companion tracker via Vehicle.setTrackerEnabled(bool) (NEXAM_TRACKER_CONFIG 42005).
         TrackingToggleAction { }

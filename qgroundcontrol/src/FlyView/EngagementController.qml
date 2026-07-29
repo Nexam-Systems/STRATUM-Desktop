@@ -32,6 +32,11 @@ Item {
     // (PX4FirmwarePlugin.cc constructor + updateAvailableFlightModes re-injection).
     readonly property string engagementModeName:       qsTr("Engagement")
     readonly property string visionEngagementModeName: qsTr("Vision Engagement")
+    // PN-ENG: custom sub_mode 24, which Commander maps to nav_state 30. The sub-mode
+    // number and the nav_state number are unrelated -- 30 is the reclaimed EXTERNAL8
+    // slot, taken because FailsafeFlags.msg's mode_req_* bitfield is uint32 and
+    // nav_states 0-31 exhaust it. Do not infer one number from the other.
+    readonly property string pnEngagementModeName:     qsTr("PN Engagement")
     readonly property string abortModeName:            qsTr("Abort")
 
     // Abort-destination selection, mirroring the PX4 ABRT_* parameters.
@@ -62,6 +67,16 @@ Item {
     // mode from coordinate Engagement; the two are mutually exclusive.
     readonly property bool visionEngaged:
         !!_activeVehicle && _activeVehicle.flightMode === visionEngagementModeName
+
+    // UI gate: true while the vehicle is in PN Engagement (sub 24). PN-ENG is a THIRD,
+    // mutually exclusive engagement mode: it takes a fixed lat/lon target from
+    // standoff_setpoint (MAV_CMD_DO_STANDOFF, 31010) like coordinate Engagement, but
+    // runs a proportional-navigation law plus a closing-speed regulator and publishes
+    // an acceleration setpoint rather than an attitude. Panels keying off this should
+    // also read PN_ENGAGEMENT_STATUS (42006): unlike the other two modes, PN-ENG can
+    // enter and then decline to guide, holding hover on an entry-gate reject.
+    readonly property bool pnEngaged:
+        !!_activeVehicle && _activeVehicle.flightMode === pnEngagementModeName
 
     // Parameter access. A bare FactPanelController targets the active vehicle and
     // routes value writes through ParameterManager (confirmed PARAM_SET).
@@ -133,6 +148,24 @@ Item {
         }
         _ensureArmed()
         _activeVehicle.flightMode = visionEngagementModeName
+    }
+
+    // PN Engagement (custom sub_mode 24): proportional-navigation terminal guidance
+    // against the LATCHED standoff target. The abort loop and arm-on-engage safety are
+    // reused unchanged from coordinate Engagement.
+    //
+    // Deliberately does NOT send DO_STANDOFF. The firmware's standoff_setpoint is a
+    // latched one-shot -- which is why PNE_TGT_TOUT defaults to 0 (timeout disabled)
+    // and why that default is correct, not an oversight. Re-sending the designation on
+    // engage would let a stale operator map selection silently redefine the target at
+    // the moment of commit. Designation and commitment are separate operator acts:
+    // Set Standoff designates, PN Engage commits.
+    function pnEngage() {
+        if (!_activeVehicle) {
+            return
+        }
+        _ensureArmed()
+        _activeVehicle.flightMode = pnEngagementModeName
     }
 
     // Operator-initiated break-off. Deliberately independent of any valid

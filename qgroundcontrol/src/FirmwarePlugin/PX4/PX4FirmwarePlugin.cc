@@ -45,6 +45,11 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
     const QString standoffFlightModeName = tr("Standoff");
     const QString engagementFlightModeName = tr("Engagement");
     const QString visionEngagementFlightModeName = tr("Vision Engagement");
+    // STRATUM: this literal is the interface. setFlightMode() resolves a mode by
+    // case-insensitive NAME against _flightModeList, so EngagementController.qml's
+    // pnEngagementModeName must read exactly "PN Engagement". A mismatch does not
+    // raise: the lookup simply finds nothing and the command is never sent.
+    const QString pnEngagementFlightModeName = tr("PN Engagement");
     const QString abortFlightModeName = tr("Abort");
 
     _setModeEnumToModeStringMapping({
@@ -68,6 +73,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
         { PX4CustomMode::AUTO_STANDOFF, standoffFlightModeName    },
         { PX4CustomMode::AUTO_ENGAGEMENT, engagementFlightModeName },
         { PX4CustomMode::AUTO_VISION_ENGAGEMENT, visionEngagementFlightModeName },
+        { PX4CustomMode::AUTO_PN_ENGAGEMENT, pnEngagementFlightModeName },
         { PX4CustomMode::AUTO_ABORT,    abortFlightModeName       },
     });
 
@@ -93,6 +99,7 @@ PX4FirmwarePlugin::PX4FirmwarePlugin()
         { standoffFlightModeName,   PX4CustomMode::AUTO_STANDOFF,   true,   true },
         { engagementFlightModeName, PX4CustomMode::AUTO_ENGAGEMENT, true,   true },
         { visionEngagementFlightModeName, PX4CustomMode::AUTO_VISION_ENGAGEMENT, true, true },
+        { pnEngagementFlightModeName, PX4CustomMode::AUTO_PN_ENGAGEMENT, true,  true },
         { abortFlightModeName,      PX4CustomMode::AUTO_ABORT,      true,   true },
     };
 
@@ -191,6 +198,16 @@ void PX4FirmwarePlugin::initializeVehicle(Vehicle* vehicle)
                             false,                                  // showError
                             MAVLINK_MSG_ID_ENGAGEMENT_STATUS,       // param1: message id
                             200000);                                // param2: 200 ms => 5 Hz
+
+    // STRATUM: same for PN_ENGAGEMENT_STATUS (42006), at ~10 Hz. The higher rate is not
+    // symmetry with 42001 -- PN-ENG's operator-facing quantities (the entry-gate verdict,
+    // the uMag/uMin authority margin, the abort countdown) change on a timescale that
+    // 5 Hz aliases. Also harmless on firmware that does not know the message.
+    vehicle->sendMavCommand(vehicle->defaultComponentId(),
+                            MAV_CMD_SET_MESSAGE_INTERVAL,
+                            false,                                  // showError
+                            MAVLINK_MSG_ID_PN_ENGAGEMENT_STATUS,    // param1: message id
+                            100000);                                // param2: 100 ms => 10 Hz
 }
 
 bool PX4FirmwarePlugin::sendHomePositionToVehicle(void) const
@@ -801,6 +818,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         { PX4CustomMode::AUTO_STANDOFF,          "Standoff"          },
         { PX4CustomMode::AUTO_ENGAGEMENT,        "Engagement"        },
         { PX4CustomMode::AUTO_VISION_ENGAGEMENT, "Vision Engagement" },
+        { PX4CustomMode::AUTO_PN_ENGAGEMENT,     "PN Engagement"     },
         { PX4CustomMode::AUTO_ABORT,             "Abort"             },
     };
     for (const auto &sm : stratumModes) {
@@ -840,6 +858,7 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::AUTO_STANDOFF     :   // STRATUM
         case PX4CustomMode::AUTO_ENGAGEMENT   :   // STRATUM
         case PX4CustomMode::AUTO_VISION_ENGAGEMENT: // STRATUM
+        case PX4CustomMode::AUTO_PN_ENGAGEMENT:   // STRATUM
         case PX4CustomMode::AUTO_ABORT        :   // STRATUM
             mode.multiRotor = true;
             break;
@@ -854,6 +873,16 @@ void PX4FirmwarePlugin::updateAvailableFlightModes(FlightModeList &modeList)
         case PX4CustomMode::POSCTL_ORBIT      :
         case PX4CustomMode::AUTO_FOLLOW_TARGET:
         case PX4CustomMode::AUTO_PRECLAND     :
+        // STRATUM: PN Engagement is deliberately NOT fixed-wing, which is where it
+        // diverges from Standoff / Engagement / Vision Engagement below. The firmware
+        // module declares `depends on MODULES_MC_POS_CONTROL` and publishes a pure
+        // acceleration trajectory_setpoint that only the multicopter position
+        // controller consumes; on a pure fixed-wing airframe the setpoint has no
+        // consumer, so offering the mode would advertise authority that does not
+        // exist. A VTOL is unaffected: flightModes() reports neither fixedWing() nor
+        // multiRotor() for it and falls through to the `other` branch, which shows
+        // every mode.
+        case PX4CustomMode::AUTO_PN_ENGAGEMENT:   // STRATUM
             mode.fixedWing = false;
             break;
         case PX4CustomMode::OFFBOARD          :

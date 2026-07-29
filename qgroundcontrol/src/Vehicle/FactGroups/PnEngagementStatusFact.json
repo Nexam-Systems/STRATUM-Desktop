@@ -1,0 +1,135 @@
+{
+    "version":      1,
+    "fileType":     "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "state",
+    "shortDesc":        "PN-ENG state (0=INACTIVE, 1=GATE REJECT, 2=GUIDING, 3=TERMINAL, 4=RECOVER)",
+    "type":             "uint8"
+},
+{
+    "name":             "range",
+    "shortDesc":        "Slant range to target",
+    "type":             "float",
+    "units":            "m",
+    "decimalPlaces":    1
+},
+{
+    "name":             "horizRange",
+    "shortDesc":        "Horizontal range to target; the quantity the entry gate tests",
+    "type":             "float",
+    "units":            "m",
+    "decimalPlaces":    1
+},
+{
+    "name":             "closingSpeed",
+    "shortDesc":        "Closing speed along line of sight, positive when closing",
+    "type":             "float",
+    "units":            "m/s",
+    "decimalPlaces":    1
+},
+{
+    "name":             "losBearing",
+    "shortDesc":        "Line-of-sight bearing to target, 0 = North, clockwise positive",
+    "type":             "float",
+    "units":            "rad",
+    "decimalPlaces":    3
+},
+{
+    "name":             "losElevation",
+    "shortDesc":        "Line-of-sight depression below horizon, positive down",
+    "type":             "float",
+    "units":            "rad",
+    "decimalPlaces":    3
+},
+{
+    "name":             "timeToImpact",
+    "shortDesc":        "Estimated time to intercept",
+    "type":             "float",
+    "units":            "s",
+    "decimalPlaces":    1
+},
+{
+    "name":             "uMag",
+    "shortDesc":        "Specific thrust magnitude being demanded",
+    "type":             "float",
+    "units":            "m/s/s",
+    "decimalPlaces":    2
+},
+{
+    "name":             "uMin",
+    "shortDesc":        "Authority floor at the current speed; uMag below this loses control margin",
+    "type":             "float",
+    "units":            "m/s/s",
+    "decimalPlaces":    2
+},
+{
+    "name":             "collectivePred",
+    "shortDesc":        "Predicted normalised collective; approaching zero means the motors are clipping",
+    "type":             "float",
+    "decimalPlaces":    3
+},
+{
+    "name":             "tilt",
+    "shortDesc":        "Predicted thrust-axis tilt from vertical (thrust axis, not pitch attitude)",
+    "type":             "float",
+    "units":            "rad",
+    "decimalPlaces":    3
+},
+{
+    "name":             "vHoriz",
+    "shortDesc":        "Horizontal speed",
+    "type":             "float",
+    "units":            "m/s",
+    "decimalPlaces":    1
+},
+{
+    "name":             "vDesEff",
+    "shortDesc":        "Effective commanded closing speed after entry ramp and VRS guard",
+    "type":             "float",
+    "units":            "m/s",
+    "decimalPlaces":    1
+},
+{
+    "name":             "valid",
+    "shortDesc":        "1 if the target solution is valid this cycle",
+    "type":             "uint8"
+},
+{
+    "name":             "gatePass",
+    "shortDesc":        "1 if the entry gate was satisfied; 0 also means unknown, never assume passed",
+    "type":             "uint8"
+},
+{
+    "name":             "committed",
+    "shortDesc":        "1 once the terminal freeze has latched inside PNE_R_MIN",
+    "type":             "uint8"
+},
+{
+    "name":             "authorityExceeded",
+    "shortDesc":        "1 if the authority floor exceeds what the airframe can produce",
+    "type":             "uint8"
+},
+{
+    "name":             "vrsGuardActive",
+    "shortDesc":        "1 while the vortex-ring-state guard is attenuating the descent command",
+    "type":             "uint8"
+},
+{
+    "name":             "clampLat",
+    "shortDesc":        "1 while the PN command is clamped by PNE_MAX_G",
+    "type":             "uint8"
+},
+{
+    "name":             "clampTilt",
+    "shortDesc":        "1 while the thrust-axis tilt is clamped by PNE_TILT_MAX",
+    "type":             "uint8"
+},
+{
+    "name":             "clampUmag",
+    "shortDesc":        "1 while the authority floor is scaling the command up",
+    "type":             "uint8"
+}
+]
+}

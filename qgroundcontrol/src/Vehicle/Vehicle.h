@@ -53,6 +53,7 @@ class VehicleVibrationFactGroup;
 class VehicleWindFactGroup;
 class VehicleEngagementStatusFactGroup;   // STRATUM
 class VehicleVisionEngagementStatusFactGroup;   // STRATUM
+class VehiclePnEngagementStatusFactGroup;   // STRATUM
 class VehicleTargetTrackFactGroup;   // STRATUM
 class Autotune;
 class ComponentInformationManager;
@@ -243,6 +244,7 @@ public:
     Q_PROPERTY(FactGroup*           vibration       READ vibrationFactGroup         CONSTANT)
     Q_PROPERTY(FactGroup*           engagementStatus READ engagementStatusFactGroup CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           visionEngagementStatus READ visionEngagementStatusFactGroup CONSTANT)   // STRATUM
+    Q_PROPERTY(FactGroup*           pnEngagementStatus READ pnEngagementStatusFactGroup CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           targetTrack     READ targetTrackFactGroup       CONSTANT)   // STRATUM
     Q_PROPERTY(FactGroup*           temperature     READ temperatureFactGroup       CONSTANT)
     Q_PROPERTY(FactGroup*           clock           READ clockFactGroup             CONSTANT)
@@ -587,6 +589,7 @@ public:
     FactGroup* vibrationFactGroup           ();
     FactGroup* engagementStatusFactGroup    ();   // STRATUM
     FactGroup* visionEngagementStatusFactGroup ();   // STRATUM
+    FactGroup* pnEngagementStatusFactGroup  ();   // STRATUM
     FactGroup* targetTrackFactGroup         ();   // STRATUM
     FactGroup* temperatureFactGroup         ();
     FactGroup* clockFactGroup               ();
@@ -1117,6 +1120,7 @@ public:
     const QString _vibrationFactGroupName =          QStringLiteral("vibration");
     const QString _engagementStatusFactGroupName =   QStringLiteral("engagementStatus");   // STRATUM
     const QString _visionEngagementStatusFactGroupName = QStringLiteral("visionEngagementStatus");   // STRATUM
+    const QString _pnEngagementStatusFactGroupName = QStringLiteral("pnEngagementStatus");   // STRATUM
     const QString _targetTrackFactGroupName =        QStringLiteral("targetTrack");   // STRATUM
     const QString _temperatureFactGroupName =        QStringLiteral("temperature");
     const QString _clockFactGroupName =              QStringLiteral("clock");
@@ -1140,6 +1144,7 @@ public:
     VehicleVibrationFactGroup*          _vibrationFactGroup         = nullptr;
     VehicleEngagementStatusFactGroup*   _engagementStatusFactGroup  = nullptr;   // STRATUM
     VehicleVisionEngagementStatusFactGroup* _visionEngagementStatusFactGroup = nullptr;   // STRATUM
+    VehiclePnEngagementStatusFactGroup* _pnEngagementStatusFactGroup = nullptr;   // STRATUM
     VehicleTargetTrackFactGroup*        _targetTrackFactGroup       = nullptr;   // STRATUM
     VehicleTemperatureFactGroup*        _temperatureFactGroup       = nullptr;
     VehicleClockFactGroup*              _clockFactGroup             = nullptr;

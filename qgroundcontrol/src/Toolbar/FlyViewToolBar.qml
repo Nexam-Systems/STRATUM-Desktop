@@ -29,6 +29,11 @@ Item {
     // FlyViewToolStrip.qml and FlightMap/MapItems/VehicleMapItem.qml.
     readonly property string _abortModeName:      qsTr("Abort")
     readonly property string _engagementModeName: qsTr("Engagement")
+    // All three engagement modes take the red ribbon: it encodes "committed to a terminal
+    // run", not which guidance law is running. Vision Engagement was previously absent
+    // from this test and showed the green operations ribbon; it is added with PN.
+    readonly property string _visionEngagementModeName: qsTr("Vision Engagement")
+    readonly property string _pnEngagementModeName:     qsTr("PN Engagement")
     readonly property string _holdModeName:       _activeVehicle ? _activeVehicle.pauseFlightMode : qsTr("Hold")
     property color _ribbonColor: {
         if (!_activeVehicle) {
@@ -41,8 +46,8 @@ Item {
         if (mode === _abortModeName) {
             return "#F59E0B"                    // abort
         }
-        if (mode === _engagementModeName) {
-            return "#DC2626"                    // engagement
+        if (mode === _engagementModeName || mode === _visionEngagementModeName || mode === _pnEngagementModeName) {
+            return "#DC2626"                    // engagement (coordinate, vision, or PN)
         }
         if (mode === qsTr("Standoff") || mode === qsTr("Takeoff") || mode === _holdModeName || _activeVehicle.flying) {
             return "#22C55E"                    // normal operations
