@@ -1,0 +1,1192 @@
+
+
+===== PAGE 1 =====
+NEXAM SYSTEMS
+UNCREWED AIRCRAFT SYSTEMS  ·  SYSTEMS ENGINEERING
+ARCHITECTURE DESCRIPTION
+Multi-Vehicle
+Orchestration Subsystem
+STRATUM Command & Control · Dagger Air Vehicle
+Document number NXM-SW-ARCH-STRATUM-MVO-001
+Revision v0.2
+Date 03 September 2026
+System of interest Multi-vehicle orchestration subsystem, STRATUM-Desktop
+Ground baseline STRATUM-Desktop @ 4095ba3
+Air baseline PX4-Autopilot-NX (Dagger), working tree
+Status For internal review — decisions D1–D9 proposed, ﬁve rulings open
+COMPANY PROPRIETARY
+This document describes an architecture as a set of decisions and their consequences. It is derived from a direct scan of both
+code baselines named above; every claim about existing behaviour carries a ﬁle and line reference.
+
+
+===== PAGE 2 =====
+—Contents
+1 Purpose, scope and deﬁnitions
+2 The as-built baseline
+2.1 The single-vehicle control chain  ·  2.2 What is already multi-vehicle  ·  2.3 What is not  ·  2.4 Five ﬁndings
+3 Architectural decisions D1–D9
+4 Entity model and component architecture
+5 Data ﬂow architecture
+5.1 Command path  ·  5.2 Telemetry path  ·  5.3 Wire contract
+6 Behavioural architecture
+6.1 Operator workﬂow  ·  6.2 Mission state machine  ·  6.3 Agent state machine  ·  6.4 Commit sequence
+7 Deconﬂiction architecture
+8 Failure and degraded modes
+9 Firmware deltas and implementation staging
+10 Risk register
+11 Open decisions requiring ruling
+A Appendix — wire contract and parameter reference
+Figures
+1 System context — operator, STRATUM, three vehicles
+2 As-built single-vehicle control chain
+3 Standoﬀ geometry and the PX4 phase machine
+4 Layered target architecture
+5 Entity–relationship model
+6 Orchestration module decomposition
+7 Command data ﬂow — one agent, end to end
+8 Telemetry data ﬂow and the separation monitor
+9 Operator workﬂow — the ﬁve-page wizard
+10 Mission state machine
+11 Agent state machine
+12 Commit sequence — STRATUM to PX4, three agents
+13 Deconﬂiction, plan view — ring geometry and θmin
+14 Deconﬂiction, elevation — transit-level stratiﬁcation
+15 Operative separation minimum against GNSS accuracy
+16 Minimum angular separation against ring radius
+17 Degraded-mode behaviour map
+18 Implementation staging
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 1
+
+
+===== PAGE 3 =====
+1 Purpose, scope and definitions
+An architecture is a set of decisions. Everything else is consequence. This document records nine decisions for
+coordinating three Dagger air vehicles onto a standoff ring, the evidence from both code baselines that forced
+them, and the five rulings still outstanding.
+1.1 Purpose
+This document defines the architecture of a multi-vehicle orchestration subsystem residing inside STRATUM-Desktop. The
+subsystem coordinates up to three Dagger air vehicles onto distinct stations on a standoff ring about a single operator-
+designated target. It is written to be reviewed, argued with, and then built from; §11 lists the questions that must be answered
+before construction begins.
+1.2 Scope
+In scope: target designation, ring definition, slot assignment, launch and transit sequencing, arrival detection, separation
+assurance, and degraded-mode behaviour for a three-vehicle ensemble. Out of scope, deliberately and explicitly: multiple
+simultaneous targets; fixed-wing standoff geometry; inter-vehicle datalinks; and — pending the ruling in §11.5 — any
+transition from an orchestrated standoff into a terminal engagement.
+1.3 Deﬁnitions
+Terms are fixed here and used with these meanings throughout. A term defined here is never used loosely elsewhere in the
+document.
+Term Definition
+Target A single geodetic point designated by the operator. One per mission. Primitive.
+Standoﬀ ring The horizontal circle of radius R centred on the target at height H above home. Derived,
+never stored independently — it therefore cannot disagree with the target.
+Ring slot A station on the ring, identiﬁed by bearing θ from target to hold point (0 = North, clockwise).
+One vehicle per slot; one slot per vehicle.
+Transit level The altitude at which a vehicle performs its horizontal run-in. Distinct from the slot's hold
+height, and the basis of vertical deconﬂiction.
+Agent STRATUM's per-vehicle orchestration object: one Vehicle*, one slot, one state machine. An
+agent pins its vehicle for life and never reads activeVehicle.
+Commit The act of sending a vehicle its standoﬀ geometry and switching it into the Standoﬀ ﬂight
+mode. The irreversible step in the sequence.
+Separation bubble The keepout sphere carried by each vehicle. The nominal 1 m ﬁgure is retained as a hard
+body keepout but is not the operative criterion; §7.5 derives what is.
+Deconﬂiction by
+construction
+Separation guaranteed by geometry and schedule chosen before ﬂight, rather than by a
+runtime avoidance controller. The organising principle of §7.
+Tradespace The set of feasible architectures spanned by the decisions in §3, together with the
+consequences each choice imposes.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 2
+
+
+===== PAGE 4 =====
+1.4 System context
+The system of interest sits between one operator and three air vehicles. It has no peers, no external interfaces beyond the
+existing MAVLink transport, and no authority that the operator has not granted. Figure 1 fixes the boundary.
+SYSTEM OF INTEREST BOUNDARY
+Operator
+designates target,
+places slots, authorises
+STRATUM-Desktop
+QGroundControl-derived C2
+existing single-vehicle capability
+Orchestration subsystem (new)
+MAVLink 2 transport
+abstracted — radio topology out of scope
+Dagger 1 · PX4-NX
+Standoﬀ mode (nav_state 9) owns hold-point geometry
+MAV_SYS_ID = 1
+Dagger 2 · PX4-NX
+identical ﬁrmware, independent command queue
+MAV_SYS_ID = 2
+Dagger 3 · PX4-NX
+no awareness of neighbours — by decision D1
+MAV_SYS_ID = 3
+intent
+state
+commands
+telemetry
+Vehicles are peers to one another only through STRATUM. There is no inter-vehicle link
+Figure 1 — System context. The orchestration subsystem is additive: it sits alongside the existing single-vehicle capability
+inside STRATUM and reaches the vehicles through the same per-vehicle command path. Every coordinating decision is made on
+the ground; no vehicle is aware that the others exist.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 3
+
+
+===== PAGE 5 =====
+2 The as-built baseline
+An architecture built on an assumed baseline is a hypothesis. This section records what the two code baselines actually do, with
+references, because four of the nine decisions in §3 were changed by what the scan found.
+2.1 The single-vehicle control chain
+The essential division of labour in the existing system is already correct, and it is not the one an outside reader would assume.
+STRATUM does not compute the standoff hold point. It transmits the target plus three scalars; the firmware translates the
+target, resolves the hold altitude against home, and computes the facing yaw itself.
+GROUND — STRATUM-DESKTOP (Qt / QML / C++)
+WIRE — MAVLINK 2
+AIR — PX4-AUTOPILOT-NX
+Set Standoﬀ panel
+FlyViewWidgetLayer.qml:266
+StandoﬀController.qml
+beginStandoff(d,h,θ,target)
+Vehicle::guidedModeStandoﬀ
+Vehicle.cc:1927
+PX4FirmwarePlugin
+PX4FirmwarePlugin.cc:447
+MavCommandQueue — one instance per Vehicle
+3 retries · ACK matched on (compId, command) within this vehicle's queue only
+Vehicle.ﬂightMode = "Standoﬀ"
+resolves to DO_SET_MODE, custom main = 4, sub = 20
+DO_SET_MODE (176) — COMMAND_LONG DO_STANDOFF (31010) — COMMAND_INT, frame 6
+x=lat·1e7 y=lon·1e7 z=H p1=distance p2=bearing p4=NaN
+mavlink_receiver.cpp:832
+decode → publish standoﬀ_setpoint (uORB) → ACCEPTED / DENIED
+commander
+nav_state ← 9 (NAVIGATION_STATE_STANDOFF)
+navigator / standoﬀ.cpp — phase machine, owns all geometry
+HEADING → APPROACH → HEIGHT → DIRECTION → request_hold_mode() once on settle (standoﬀ.cpp:139)
+publishes position_setpoint_triplet · POSITION for phases 1–3, LOITER terminal
+Figure 2 — As-built single-vehicle control chain. Two independent messages carry the mission: the geometry (31010) and
+the mode selection (176). PX4 tolerates either order; STRATUM sends geometry ﬁrst so the mode never activates against an
+empty setpoint. Everything below StandoffController.qml is already scoped to one Vehicle instance — including the
+command queue, its retries and its ACK matching.
+2.2 The ﬁrmware's geometry and staging
+The Standoff mode decomposes the manoeuvre into four ordered phases rather than commanding one diagonal move. The
+rationale in the firmware documentation is sensor settling: a payload that must acquire the target benefits from turning,
+translating and changing height as discrete, observable steps. That decision, taken for a single vehicle and for a wholly
+different reason, is what makes vertical deconfliction free for three vehicles — see finding F3 and §7.3.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 4
+
+
+===== PAGE 6 =====
+PLAN VIEW — GEOMETRY OWNED BY PX4
+target
+x = lat·1e7, y = lon·1e7
+R = param1 (distance)
+θ = param2
+bearing target → hold point
+hold point
+computed by PX4, not STRATUM
+yaw = θ + 180°, nose on target
+PHASE MACHINE — navigator/standoff.cpp
+HEADING
+yaw in place onto target
+APPROACH
+translate at latched altitude
+HEIGHT
+climb / descend over slot
+DIRECTION
+terminal LOITER, never completes
+Hold (nav_state 3)
+request_hold_mode(), once
+acceptance
+MIS_YAW_ERR · MIS_YAW_TMT
+NAV_ACC_RAD
+altitude = value latched at
+begin_sequence (standoﬀ.cpp:238)
+NAV_MC_ALT_RAD
+yaw threshold or yaw timeout
+observable arrival event
+nav_state 9 → 3, free of chargeSTDF_SEQ ∈ {2,4} folds HEIGHT into APPROACH
+— which collapses the vertical separation §7.3 depends on. Deconﬂiction-critical parameter.
+Figure 3 — Standoﬀ geometry and the PX4 phase machine. The ﬁrmware translates the target by param1 along param2,
+resolves hold altitude as home + z, and yaws to face the target. The APPROACH phase ﬂies at the altitude latched when the
+sequence begins — the hook on which the entire deconﬂiction architecture rests.
+2.3 What is already multi-vehicle
+Everything below the QML layer. This is the most consequential finding of the scan, because it converts the work from a
+refactor into an addition — and a refactor of a working weapon-system C2 application is a risk that does not need to be taken.
+Element State
+MultiVehicleManager Stock and unmodiﬁed. multiVehicleEnabled() returns true and STRATUM
+does not override QGCOptions — multi-vehicle instantiation is already live.
+Provides vehicles(), selectedVehicles, and
+vehicleAdded/vehicleRemoved.
+MavCommandQueue Constructed per Vehicle (Vehicle.cc:266). Retry and ACK matching are
+scoped to one vehicle's queue. Three concurrent commands to three vehicles are
+safe by construction; no new queuing infrastructure is required.
+VehicleLinkManager Per-Vehicle, already many-to-many on links. The NEXAM_TARGET_SELECT
+broadcast ﬁx (d2d616a) established the correct idiom: enumerate this vehicle's
+links, never "the" link.
+FactGroups Every group is a per-Vehicle member, including the Nexam engagement and
+target-track groups and the GNSS horizontalAccuracy / verticalAccuracy
+facts. Three vehicles yield three independent fact trees with no plumbing.
+VehicleMapItem.qml Already rendered through a MapItemView over the full vehicles model. The
+map draws every connected vehicle today.
+PlanMasterController startStaticActiveVehicle(Vehicle*) exists and is already used per-vehicle
+in FlyViewMap.qml:463. Per-vehicle mission upload is proven if routed
+approaches are ever needed.
+MultiVehicleList.qml
+MultiVehicleSelector.qml
+Stock, present, and gated behind enableMultiVehiclePanel. Inert but
+available.
+2.4 What is not
+Only the Nexam FlyView QML singletons. Each is instantiated exactly once and bound to
+QGroundControl.multiVehicleManager.activeVehicle: StandoffController, EngagementController, the abort
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 5
+
+
+===== PAGE 7 =====
+and vision overlays, the Set Standoff panel, every custom GuidedAction* button, and — visually — the single surveillance
+circle and target marker in FlyViewMap.qml:796–873.
+Two components already do it correctly and serve as the internal precedent: TrackerRoiOverlay.qml and
+TargetTrackingOverlay.qml both take vehicle as a required property rather than reaching for the global. The
+architecture in §4 generalises that precedent rather than inventing a pattern.
+2.5 Five ﬁndings that dictate the architecture
+FINDING F1 — PX4 OWNS THE HOLD-POINT GEOMETRY
+On the wire, a three-vehicle ring mission is three single-vehicle standoffs that differ in param2 alone. This is the cheapest
+possible extension of a proven contract, and it removes the trajectory generator from STRATUM's requirements entirely.
+FINDING F2 — ARRIVAL IS ALREADY OBSERVABLE
+standoff.cpp:139 calls request_hold_mode() exactly once when the terminal pose settles. The vehicle therefore
+announces its own arrival as a nav_state 9 → 3 transition. No new telemetry, no vehicle-side change, no arrival estimator.
+FINDING F3 — THE RUN-IN FLIES AT THE ALTITUDE LATCHED ON ACTIVATION
+standoff.cpp:238 latches _approach_alt_amsl from the current global position at begin_sequence(), and
+APPROACH publishes that altitude. Climb each vehicle to its own transit level before commit and the run-ins are vertically
+separated with zero firmware change. Conditional on STDF_SEQ ∈ {1,3}.
+FINDING F4 — CRUISING SPEED IS TRIMMABLE, BUT ONLY AFTER ACTIVATION
+on_activation calls reset_cruising_speed(), and APPROACH republishes its setpoint every cycle carrying
+cruising_speed = get_cruising_speed() (standoff.cpp:388). A DO_CHANGE_SPEED sent after nav_state ==
+9 is confirmed takes effect within one navigator cycle. Sent before, it is discarded.
+FINDING F5 — FAILSAFE DEFAULTS ARE HOSTILE TO A RING
+No custom mode has bespoke failsafe treatment; all four are bucketed with stock AUTO modes under the generic AutoModes
+exception bit (failsafe.cpp:504–542). With stock parameters: NAV_DLL_ACT = 0 — datalink loss triggers nothing;
+COM_RCL_EXCEPT = 0 with NAV_RCL_ACT = 2 — RC loss triggers RTL. Three vehicles executing independent,
+uncoordinated RTLs from three points on a ring is precisely the crossing pattern this subsystem exists to prevent.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 6
+
+
+===== PAGE 8 =====
+3 Architectural decisions
+Nine decisions. Each states the option space, the choice, and the consequence the choice imposes. A decision without a stated
+consequence is a preference, not an architecture.
+D1 LOCUS OF COORDINATION
+Options. (a) ground-side orchestration in STRATUM; (b) onboard distributed coordination between vehicles; (c) hybrid —
+ground planning, onboard deconfliction.
+Decision: (a). STRATUM plans and supervises; PX4 executes. No inter-vehicle link, no onboard awareness of
+neighbours.
+Rationale. Option (b) requires an inter-vehicle datalink, a shared world model and a distributed-consensus safety case;
+that is a programme, not a feature, and it is unjustified at n = 3. Option (c) requires firmware change to a stack whose
+own documentation records that it was statically reviewed but never compile-verified in the environment that produced
+it. Option (a) reuses a proven contract end to end.
+Consequence. Ground-side coordination promotes the C2 link from a supervisory element to a mission-critical one.
+That consequence is paid off by D4: if separation is guaranteed by geometry rather than by supervision, losing the link
+degrades the mission without endangering the airframes. The link must not be load-bearing for safety. This is the
+single most important structural commitment in this document, and every later decision is checked against it.
+D2 COMMAND PRIMITIVE
+Options. (a) reuse DO_STANDOFF (31010) + DO_SET_MODE per vehicle; (b) upload per-vehicle missions through
+MissionManager; (c) stream offboard setpoints from STRATUM.
+Decision: (a), with (b) held in reserve for multi-leg routing.
+Option (c) is rejected outright: streaming setpoints from a ground station makes the radio link an inner control loop,
+which fails D1's payoff condition immediately and converts every link dropout into a control-loop failure. Option (b) is
+over-engineering for a straight-line run-in, but the machinery exists, is already per-vehicle, and remains available if
+terrain or airspace ever forces routed approaches.
+D3 GEOMETRY BOUNDARY
+Decision: STRATUM owns ring geometry and scheduling. PX4 owns hold-point geometry and approach staging.
+The boundary is the existing 31010 contract, unchanged.
+STRATUM computes the ring from (target, R, H); the per-slot bearing θi; the per-vehicle transit level; and the commit
+schedule. It sends (target, R, θi, H) to vehicle i. Nothing else crosses the boundary.
+Consequence. The wire contract is untouched, the firmware is untouched, and three vehicles differ by one float. This
+decision is what keeps the change small enough to verify.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 7
+
+
+===== PAGE 9 =====
+D4 TRANSIT DECONFLICTION MECHANISM
+Options. (a) closed-loop ground-commanded avoidance; (b) altitude stratification during run-in; (c) strict temporal sequencing,
+one vehicle at a time; (d) crossing-free slot assignment.
+Decision: (b) + (d) as the primary mechanism, (c) as an operator-selectable conservative mode, (a) rejected.
+Why (a) is rejected, precisely. The loop would enforce a metre-class separation criterion using positions known to
+roughly ±1–2.5 m per vehicle, sampled at telemetry rate, transported over a link with variable latency, actuated by a
+mode change with an ACK round trip. The loop delay is comparable to the time a 15 m/s vehicle needs to traverse the
+entire keepout volume. Such a controller does not add safety; it adds a failure mode that activates precisely when the
+link is degraded — that is, when the vehicles are already least supervised. STRATUM will not command avoidance
+manoeuvres.
+Options (b) and (d) are free, deterministic, and verifiable before the vehicles leave the ground. §7 develops them.
+D5 SLOT ASSIGNMENT POLICY
+Decision: STRATUM proposes; the operator disposes. The proposal is the cyclic-order-preserving assignment
+that minimises total run-in path length. Any override is permitted; an override that induces a path crossing is
+flagged, not blocked.
+"Optimum" was undefined in the original objectives. This decision defines it as minimum total path length subject to a
+no-crossing constraint — the objective that also happens to buy deconfliction. At n = 3 the assignment problem is six
+permutations; enumeration is exact and costs nothing, so no solver is introduced.
+The no-crossing constraint has a clean geometric basis: if the cyclic angular order of the vehicles' launch positions about
+the target matches the cyclic order of their assigned slot bearings, straight-line run-ins do not cross.
+D6 SEPARATION ENFORCEMENT SEMANTICS
+Decision: the separation function is an advisory monitor that may recommend and, on operator authorisation,
+command HOLD. It never commands a manoeuvre. The 1 m bubble is retained as the hard body keepout but is
+not the operative criterion.
+§7.5 derives the operative criterion as an uncertainty-inflated separation minimum and moves its enforcement from
+runtime to slot-placement time in the wizard. Deconfliction becomes a constraint in the user interface, not a controller in
+the air. A constraint that has already succeeded on the ground cannot fail in flight.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 8
+
+
+===== PAGE 10 =====
+D7 ARRIVAL SYNCHRONISATION
+Decision: v1 achieves time coherence by staggered commit — an open-loop schedule computed from path length
+and nominal cruise speed, closed by observation of actual arrival skew. v2 adds post-activation
+DO_CHANGE_SPEED trim per finding F4.
+Whether simultaneous arrival is a requirement at all is still open (§11.2). Staggered commit costs nothing and delivers
+coherence to within the accuracy of the cruise-speed estimate — a few seconds over a 500 m run-in. If a tighter number
+is operationally required, F4 supplies the mechanism, and the ordering constraint (speed after mode activation, never
+before) is recorded here so that it is not discovered in flight test.
+D8 AUTHORITY AND FAILSAFE POSTURE
+Decision: an orchestrated mission cannot reach ARMED until STRATUM has read back and verified a required
+failsafe parameter block on every participating vehicle. Verification failure blocks the mission and names the
+offending vehicle and parameter.
+Per finding F5 the defaults are wrong for this mission. The mechanism — a gate, not a hope — is the decision; the
+values are ratified in flight test.
+Parameter Required Why
+NAV_DLL_ACT non-zero (Hold, or RTL with a
+deconﬂicted return altitude)
+A vehicle that loses STRATUM must not continue
+indeﬁnitely unsupervised.
+NAV_RCL_ACT Hold, or COM_RCL_EXCEPT bit
+1 set
+Three independent RTLs from a ring is the crossing
+case.
+COM_DLL_EXCEPT explicit, not defaulted Must be a decision, not an accident.
+RTL_RETURN_ALT per-vehicle, stratiﬁed If RTL is retained, return legs need the same vertical
+discipline as the run-in.
+STDF_SEQ 1 or 3
+(approach_with_height =
+false)
+Deconﬂiction-critical. Values 2 and 4 fold the climb
+into the approach and collapse the vertical separation
+§7.3 depends on.
+MAV_SYS_ID unique across the ﬂeet See D9.
+The STDF_SEQ row is not a preference. It is a coupling between a parameter documented as a sensor-settling
+convenience and a property the safety argument depends on. It must be verified, never assumed.
+D9 VEHICLE IDENTITY PROVISIONING
+Decision: MAV_SYS_ID is a per-airframe configuration item under production control. STRATUM detects a
+colliding fleet and refuses the mission.
+MAV_SYS_ID defaults to 1 and is unmanaged in the fork; nothing auto-assigns it. MultiVehicleManager dedupes by
+vehicle id, so two Daggers shipped as delivered will present as one vehicle — the second simply never appears. This is a
+silent failure that looks like a radio problem and is not one. It belongs in the production build and acceptance-test
+procedure, not in software.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 9
+
+
+===== PAGE 11 =====
+3.10 The architecture in one picture
+LAYER 1 — OPERATOR
+Orchestration wizard Ring editor on map Status strip · 3 lanes Advisories · HOLD ALL
+LAYER 2 — ORCHESTRATION (NEW) src/Orchestration/ · mission-level authority
+OrchestrationManager StandoﬀRing · Slots SlotAssignmentSolver TransitPlanner FailsafeVeriﬁer
+SeparationMonitor — the only component that sees the ensemble VehicleAgent × 3 — one pinned Vehicle*, one slot, one FSM
+LAYER 3 — EXISTING VEHICLE ABSTRACTION (UNCHANGED, ALREADY PER-VEHICLE)
+MultiVehicleManager
+vehicles(), add/remove
+Vehicle
+guidedMode*, facts
+MavCommandQueue
+per-vehicle retry + ACK
+FactGroups
+position, GPS acc
+VehicleLinkManager
+per-vehicle links
+LAYER 4 — WIRE (CONTRACT UNCHANGED)
+DO_STANDOFF 31010 · DO_SET_MODE 176 · DO_CHANGE_SPEED 178 · GLOBAL_POSITION_INT · GPS_RAW_INT · HEARTBEAT
+LAYER 5 — AIR VEHICLE (UNCHANGED FOR v1)
+mavlink_receiver → standoﬀ_setpoint commander → nav_state 9 navigator/standoﬀ.cpp — owns hold-point geometry
+Figure 4 — Layered target architecture. The new subsystem occupies one layer. Layer 3 is reused verbatim; layers 4 and 5
+are untouched for v1. The architectural value of that separation is that the existing single-vehicle capability — which works today
+— cannot regress as a side eﬀect of building the new one.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 10
+
+
+===== PAGE 12 =====
+4 Entity model and component architecture
+4.1 Entity model
+Two properties of this model carry weight. First, the standoff ring is derived and never stored, so it cannot drift out of
+agreement with the target. Second, SeparationMonitor is the only entity with visibility across agents — separation is an
+emergent property of the ensemble, and only the component that observes the ensemble may make a separation claim. Nothing
+else in the system is permitted to assert one.
+OrchestrationMission
+state · schedule · authorisation
+Target
+QGeoCoordinate
+primitive · exactly one
+StandoﬀRing
+R, H · DERIVED
+enforces θ_min
+CommitSchedule
+ordered (agent, t_oﬀset)
+from TransitPlanner
+SeparationMonitor
+pairwise, uncertainty-
+inﬂated · advisory only
+RingSlot
+θ · transitLevel · state
+×3
+VehicleAgent
+pinned Vehicle* · FSM
+×3
+Vehicle
+existing · never activeVehicle
+designates 1
+derives 1 owns 1
+owns 1
+contains 3
+1 ↔ 1
+bijection
+pins 1
+observes
+all 3INVARIANTS
+· one mission, one target
+· ring is derived, never
+stored independently
+· an unassigned slot does
+not exist
+· an unassigned vehicle is
+not an agent
+Figure 5 — Entity–relationship model. Cardinalities are enforced, not conventional: the slot–agent relation is a bijection, so a
+partially assigned ring is not a representable state. Multi-target operation is out of scope because it is a diﬀerent architecture, not
+a larger one.
+4.2 Component decomposition
+src/Orchestration/ — C++
+OrchestrationManager
+QML singleton · owns mission, agents, mission FSM
+StandoﬀRing
+slot coordinates
+θ_min enforcement
+RingSlot
+QObject for binding
+bearing, level, state
+SlotAssignmentSolver
+≤6 permutations, exact
+cyclic-order ﬁlter
+TransitPlanner
+levels, path lengths,
+commit schedule
+FailsafeVeriﬁer
+reads back D8 block
+gates ARM
+SeparationMonitor
+pairwise prediction
+commands nothing
+VehicleAgent × 3
+pins one Vehicle* for life · owns per-vehicle FSM
+issues commands through the existing per-vehicle API only
+src/FlyView/Orchestration/ — QML
+OrchestrationWizard.qml — ﬁve pages
+RingEditorOverlay.qml — map layer, live θ_min feedback
+AssignmentReviewPanel.qml — plan preview before commit
+OrchestrationStatusStrip.qml — three lanes
+SeparationAdvisoryOverlay.qml — advisory + HOLD ALL
+entry point added to FlyViewToolStripActionList.qml
+UNCHANGED — SINGLE-VEHICLE PATH RETAINED
+StandoﬀController.qml · EngagementController.qml · Set Standoﬀ panel
+every custom GuidedAction* button · the existing surveillance circle
+The orchestration layer is strictly additive. It calls the same
+per-vehicle Vehicle API the singletons call.
+Figure 6 — Orchestration module decomposition. Registration follows the fork's established pattern:
+add_subdirectory(Orchestration) plus a target_link_libraries entry in src/CMakeLists.txt, and a
+Q_PROPERTY on QGroundControlQmlGlobal alongside multiVehicleManager.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 11
+
+
+===== PAGE 13 =====
+5 Data flow architecture
+5.1 Command path
+The command path for one agent is shown in full in Figure 7. Two properties are worth stating before reading it. Every step is
+gated on an acknowledgement or an observed state, so the agent never assumes a command landed. And every element of the
+path below the agent already exists and is already per-vehicle, so three agents running this path concurrently contend for
+nothing.
+VEHICLE AGENT (NEW) EXISTING VEHICLE LAYER AIR VEHICLE
+1 · climb to transit level
+level_i = base + i·ΔH
+guidedModeTakeoﬀ(level_i)
+NAV_TAKEOFF / DO_REPOSITION
+vehicle climbs, holds
+gate: altitudeRelative within tolerance
+2 · send geometry
+target, R, θ_i, H
+sendMavCommandIntWithHandler
+31010 · COMMAND_INT · frame 6
+mavlink_receiver → standoﬀ_setpoint
+gate: MAV_RESULT_ACCEPTED
+3 · select mode
+bounded retry
+ﬂightMode = "Standoﬀ"
+176 · main = 4, sub = 20
+commander → nav_state 9
+gate: HEARTBEAT.custom_mode conﬁrms
+4 · speed trim (v2)
+AFTER step 3, never before
+guidedModeChangeGroundSpeed
+DO_CHANGE_SPEED · 178
+picked up on next APPROACH republish
+on_activation would have discarded it
+5 · observe run-in
+no commands issued
+position + mode facts
+GLOBAL_POSITION_INT, HEARTBEAT
+HEADING → APPROACH → HEIGHT
+ﬁrmware ﬂies it unsupervised
+6 · arrival predicate
+three conditions, §6.5
+nav_state transition watcher
+9 → 3
+DIRECTION settles → request_hold_mode()
+the vehicle announces its own arrival
+Every step is gated on an ACK or an observed state. The agent never assumes a command landed.
+Figure 7 — Command data ﬂow, one agent end to end. Steps 1–4 are commands issued down the stack; steps 5–6 are
+observations ﬂowing back up. Step 4 is dashed because it is deferred to v2 — and its ordering constraint, derived from ﬁnding F4,
+is recorded on the diagram so it cannot be lost.
+5.2 Telemetry path and the separation monitor
+The monitor consumes three streams per vehicle and produces one advisory. It is the only component permitted to reason
+across vehicles, and it is deliberately given no actuation authority — per D6, its output is information for the operator, not a
+command for an airframe.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 12
+
+
+===== PAGE 14 =====
+PER-VEHICLE TELEMETRY (EXISTING, ×3)
+GLOBAL_POSITION_INT
+lat, lon, alt, vx, vy, vz
+GPS_RAW_INT
+h_acc, v_acc (extension)
+HEARTBEAT
+custom_mode → nav_state
+Vehicle FactGroups
+coordinate · altitudeAMSL
+gpsFactGroup.horizontalAccuracy
+ﬂightMode · communicationLost
+one independent tree per vehicle —
+no new plumbing required
+VehicleAgent ×3
+state, arrival predicate
+link health
+SeparationMonitor
+3 pairs, short horizon
+SEPARATION COMPUTATION — PER PAIR (i, j)
+d_pred(i,j) = min over horizon of | p_i + v_i·t − p_j − v_j·t |
+R_req(i,j) = R_body + k · ( hAcc_i + hAcc_j ) R_body = 1 m, k = 2 (~95%)
+advisory ⟸  d_pred(i,j) < R_req(i,j) → name the pair, report time to closest approach
+If hAcc is stale or absent the monitor degrades to advisory-only and marks the aﬀected agents. It never substitutes an optimistic value.
+Operator
+advisory + HOLD ALL
+PROHIBITED
+No autonomous
+ground-commanded
+avoidance manoeuvre.
+Decision D4 / D6.
+The monitor is the only component with visibility across vehicles — and the only one permitted to make a separation claim.
+Everything upstream of it is per-vehicle by construction; everything downstream of it is an operator decision.
+Figure 8 — Telemetry data ﬂow and the separation monitor. The GNSS accuracy facts the monitor needs already exist in
+STRATUM, added by commit 6df2bc3 for a display purpose. They are re-purposed here as the input that makes the separation
+criterion honest.
+5.3 Wire contract — unchanged
+No message, field or identifier changes. The full contract is reproduced in Appendix A for reference during implementation; the
+summary is that a three-vehicle mission uses the same six message types a one-vehicle mission uses today, addressed to three
+system identifiers instead of one.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 13
+
+
+===== PAGE 15 =====
+6 Behavioural architecture
+6.1 Operator workﬂow
+The wizard exists to make the plan reviewable before it is irreversible. Everything up to page 5 is editable and costs nothing;
+page 5 puts vehicles in the air. The constraint that guarantees terminal separation is enforced on page 3, on the ground, where
+failing it is an inconvenience rather than an incident.
+PAGE 1
+Target
+map pick or
+manual lat/lon
+reuses existing panel
+PAGE 2
+Ring
+radius R
+height H above home
+ring drawn live
+PAGE 3
+Slots
+drag three handles
+onto the ring
+θ_min enforced here
+PAGE 4
+Assignment
+proposal + override
+levels, paths, skew
+crossings ﬂagged
+PAGE 5
+Commit
+preﬂight gate
+then launch
+irreversible
+free to iterate — no vehicle has moved
+PREFLIGHT GATE — ALL MUST PASS, PER VEHICLE, BEFORE PAGE 5 UNLOCKS
+armable · GPS ﬁx and hAcc within the mission separation budget · home position set · D8 failsafe block veriﬁed by read-back
+MAV_SYS_ID unique across the connected ﬂeet · STDF_SEQ ∈ {1,3} · link healthy · battery suﬃcient for the planned run-in
+Figure 9 — Operator workﬂow. Five pages, one irreversible step. The preﬂight gate is where decision D8 acquires teeth: a
+mission whose failsafe parameters have not been read back and veriﬁed cannot reach page 5.
+6.2 Mission state machine
+IDLE DEFINING_RING
+pages 1–2
+ASSIGNING_SLOTS
+pages 3–4
+PREFLIGHT
+D8 gate
+EXECUTING
+agents running
+ON_STATION
+all agents settled
+RESLOTTING
+re-commit subset
+TERMINATING
+gate fails → edit
+operator
+re-commit all arrival predicates true
+DEGRADED — ORTHOGONAL FLAG, NOT A STATE
+Raised whenever any agent leaves its nominal lane: link lost,
+preﬂight regression, separation advisory, unexpected mode change.
+It changes what the operator is shown.
+It does not change what the mission is doing.
+Modelling it as a state would multiply the state space by the number
+of fault combinations, for no behavioural gain.
+Figure 10 — Mission state machine. Seven states and one orthogonal ﬂag. The mission is editable and reversible up to
+PREFLIGHT; from EXECUTING onward the operator's controls are hold, re-slot and terminate.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 14
+
+
+===== PAGE 16 =====
+6.3 Agent state machine
+UNASSIGNED ASSIGNED PREFLIGHT LAUNCH_QUEUED TAKEOFF CLIMB_TO_LEVEL
+to transit level_i
+COMMIT_QUEUED
+waits for t_oﬀset
+STANDOFF_COMMANDED
+31010 ACK, mode pending
+RUN_IN
+nav_state == 9
+ON_STATION
+predicate §6.5 true
+HOLD RESLOT RTL LINK_LOST
+mode conﬁrmed geometry ACCEPTED level reached
+nav_state 9 → 3 comm loss — vehicle ﬂies on, deconﬂicted
+re-commit
+PREFLIGHT GATES ON
+· armable · home position set
+· hAcc within separation budget
+· D8 parameter block veriﬁed
+· MAV_SYS_ID unique
+A failed gate blocks the mission and
+names the vehicle and the parameter.
+Figure 11 — Agent state machine. An agent pins its vehicle at ASSIGNED and never releases it. Note that LINK_LOST is
+reachable from RUN_IN without becoming a hazard: the vehicle completes a run-in that was deconﬂicted before commit. That is
+decision D1's payoﬀ being collected.
+6.4 Commit schedule and arrival coherence
+Commit is staggered so that arrivals converge. STRATUM estimates each run-in duration from path length and nominal cruise
+speed, then delays each agent's commit by the difference. The schedule is open-loop; the skew is measured and reported, and
+that measurement is what informs whether the v2 speed trim is worth building.
+mission time →T0 T0+60s T0+120s
+Agent 1
+slot 000°, level 60 m
+Agent 2
+slot 120°, level 70 m
+Agent 3
+slot 240°, level 80 m
+takeoﬀ climb run-in — longest path, commits ﬁrst on station
+takeoﬀ climb run-in on station
+takeoﬀ climb run-in — shortest, commits last on station
+arrivals converge
+departure separation
+commit (31010 + mode)
+ground-commanded
+ﬁrmware-ﬂown, unsupervised
+terminal hold
+Once committed, STRATUM issues no
+further command during the run-in. The
+orange bars are the link-independent
+portion of the mission.
+Figure 12 — Commit schedule, three agents. Departures are separated in time; commits are staggered inversely to path
+length so that arrivals converge. The orange spans are the periods during which the mission does not depend on the C2 link at all
+— the practical meaning of decision D1's payoﬀ condition.
+6.5 Arrival predicate
+The 9 → 3 transition alone is not sufficient, because a vehicle can reach Hold by other routes — operator action, or a failsafe.
+ON_STATION therefore requires all three of the following, at negligible cost:
+1.  nav_state transitioned  9 → 3          (the firmware's own arrival announcement)
+2.  horizontal distance to the computed slot coordinate  <  NAV_ACC_RAD
+3.  | altitudeAMSL − (home_alt + H) |  <  altitude acceptance radius
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 15
+
+
+===== PAGE 17 =====
+6.6 Re-slotting
+An ON_STATION vehicle is in Hold, not Standoff, so re-slotting repeats the full commit sequence with the new bearing. A
+vehicle still in RUN_IN may be re-slotted by sending a fresh 31010 alone — standoff.cpp:117 restarts the staged
+manoeuvre from phase 1 on any new setpoint — but that replays the in-place yaw, which reads as abrupt to an operator
+watching the video feed. Prefer re-slotting from Hold; permit it from run-in.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 16
+
+
+===== PAGE 18 =====
+7 Deconfliction architecture
+7.1 Reframing the problem
+The 1 m bubble was specified as a station-keeping guard. The geometry says it is not needed there. Chord separation between
+two slots on a ring of radius R separated by angle θ is 2R·sin(θ/2).
+Ring radius R θ = 120° (even) θ = 30° θ = 10° θ = 1°
+50 m 86.6 m 25.9 m 8.7 m 0.87 m
+100 m 173.2 m 51.8 m 17.4 m 1.75 m
+300 m 519.6 m 155.3 m 52.3 m 5.24 m
+THE CONCLUSION THIS FORCES
+The terminal state is deconflicted by ring geometry. For two vehicles to approach the keepout volume on a 300 m ring they
+would have to be placed less than one degree apart. The conflict lives entirely in the transit phase, and specifically near the
+launch point, where three vehicles may depart from within tens of metres of one another. Any architecture that spends its effort
+on station-keeping separation is solving the wrong problem.
+PLAN VIEW — CROSSING-FREE ASSIGNMENT PRESERVES CYCLIC ORDER
+target
+S1 · θ=000°
+S2 · θ=120°S3 · θ=240°
+2R·sin(θ/2) = 1.73 R
+launch site
+three vehicles, ~20 m apart
+V1 → S1
+V3 → S3
+V2 → S2
+LAYER 1 — CONSTRAINT AT SLOT-PLACEMENT TIME
+θ_min = 2 · asin( R_req / (2R) )
+Slot handles cannot be dragged closer than θ_min.
+Terminal separation therefore becomes a UI constraint
+evaluated before ﬂight, not a controller in the air.
+A constraint that has already succeeded on
+the ground cannot fail in ﬂight.
+LAYER 3 — CYCLIC-ORDER ASSIGNMENT
+If the cyclic angular order of launch positions about
+the target matches the cyclic order of assigned slot
+bearings, straight-line run-ins do not cross.
+At n = 3 this is six permutations — enumerated exactly,
+scored by total path length, ﬁltered by the constraint.
+No solver is introduced. None is needed.
+Figure 13 — Deconﬂiction, plan view. Ring geometry separates the terminal stations by hundreds of metres; the run-in paths
+are kept from crossing by preserving cyclic order. Neither mechanism runs in ﬂight — both are settled before the ﬁrst vehicle lifts.
+7.2 Layer 1 — structural, at slot-placement time
+The wizard enforces θ_min = 2·asin(R_req / 2R) as a drag constraint on page 3. Figure 16 shows how weak that
+constraint is in practice at any operationally sensible ring radius — which is the point. The constraint costs the operator nothing
+and removes an entire failure class.
+7.3 Layer 2 — vertical stratiﬁcation during transit
+This is the workhorse, and it costs one extra climb command per vehicle. Per finding F3, the APPROACH phase flies at the
+altitude latched when Standoff activates. Climb each vehicle to its own level before commit and the run-ins are vertically
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 17
+
+
+===== PAGE 19 =====
+separated whatever their lateral paths do. The HEIGHT phase then brings each vehicle to the common hold altitude only once
+it is over its own slot, by which point Layer 1 guarantees the lateral separation.
+ELEVATION — TRANSIT LEVELS ARE DISTINCT; HOLD HEIGHT IS COMMON
+launch site standoﬀ ring
+80 m
+70 m
+60 m
+50 m
+common hold height H
+climb to level APPROACH — horizontal, at latched altitude HEIGHT hold
+V3 · level 80 m
+V2 · level 70 m
+V1 · level 60 m
+ΔH ≥ 10 m
+Valid only for STDF_SEQ ∈ {1,3}. Values 2 and 4 set approach_with_height = true, folding the climb into the run-in and collapsing every gap above.
+Figure 14 — Deconﬂiction, elevation. Lateral path crossings during the APPROACH phase are irrelevant because the paths are
+vertically separated. Vehicles converge to the common hold height only after they are over their own slots, where Layer 1 has
+already guaranteed hundreds of metres of lateral separation. ΔH = 10 m is chosen against a metre-class vertical position budget
+with wide margin.
+7.4 Layer 3 — assignment and schedule
+Cyclic-order-preserving assignment (D5) removes lateral crossings for straight-line run-ins; staggered commit (D7) separates
+departures in time. Neither costs anything, and both are computed in the planner before commit.
+7.5 Layer 4 — the monitor, and what the bubble actually is
+The operative separation minimum is not a constant. It is a function of what the system actually knows about where the
+vehicles are:
+R_req(i,j)  =  R_body  +  k · ( hAcc_i + hAcc_j )
+    R_body  =  1 m      hard body keepout — the nominal "phantom bubble"
+    hAcc    =  reported GNSS horizontal accuracy, per vehicle
+               (already in STRATUM: vehicle.gpsFactGroup.horizontalAccuracy, from
+                GPS_RAW_INT h_acc — added by commit 6df2bc3 for a display purpose)
+    k       =  2   for approximately 95% confidence
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 18
+
+
+===== PAGE 20 =====
+Operative separation minimum R_req against per-vehicle GNSS horizontal accuracy
+Both vehicles assumed at the same accuracy; k = 2; R_body = 1 m
+typical Dagger hAcc band
+14
+12
+10
+8
+6
+4
+2
+0
+R_req [m]
+0 0.5 1.0 1.5 2.0 2.5 3.0
+GNSS horizontal accuracy hAcc per vehicle [m]
+1 m nominal bubble (R_body alone)
+7.0 m at hAcc = 1.5 m
+— seven times the nominal bubble
+A criterion smaller than the measurement noise generates alarms, not safety. This is why the bubble cannot be the enforcement mechanism — and why
+the monitor degrades to advisory-only, marking the aﬀected agents, whenever hAcc is stale or absent rather than substituting an optimistic value.
+Figure 15 — Operative separation minimum against GNSS accuracy. That the operative minimum is roughly seven times
+the speciﬁed bubble at typical accuracy is not a criticism of the speciﬁcation. It is the reason the bubble cannot be the
+enforcement mechanism.
+Minimum permitted angular slot separation θ_min against ring radius, at R_req = 7 m
+θ_min = 2·asin(R_req / 2R). Three evenly spaced slots sit at 120° — two orders of magnitude above the constraint.
+16
+12
+8
+4
+0
+θ_min [deg]
+0 100 200 300 400 500
+Standoﬀ ring radius R [m]
+4.0° at R = 100 m
+1.3° at R = 300 m
+Read this as a statement about how little the constraint costs. At any operationally sensible ring radius the operator would have to place two vehicles
+within a couple of degrees of one another before the constraint engaged at all — and that placement has no tactical meaning.
+Figure 16 — Minimum angular separation against ring radius. The constraint is almost free. It exists to remove a failure
+class that no reasonable operator would enter deliberately, and that an unreasonable one could enter accidentally.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 19
+
+
+===== PAGE 21 =====
+8 Failure and degraded modes
+A degraded-mode table is the honest test of an architecture, because it is where optimistic assumptions surface. The organising
+claim below is that the C2 link is not load-bearing for safety after commit — and the table is where that claim is either kept or
+broken.
+FAULT → CONSEQUENCE → RESPONSE, BY MISSION PHASE
+BEFORE COMMIT RUN-IN (LINK-INDEPENDENT) ON STATION
+Link loss,
+one vehicle
+agent blocked at PREFLIGHT
+nothing has moved
+vehicle completes its run-in
+and holds on its own slot
+DEGRADED, not hazardous
+holds; NAV_DLL_ACT governs
+after the conﬁgured timeout
+Link loss,
+all vehicles mission cannot start all three complete and hold —
+deconﬂicted before commit
+NAV_DLL_ACT must be explicit
+— stock default does nothing
+One vehicle
+aborts / RTLs
+de-scope to two vehicles
+and re-plan, or clear fault
+remaining agents continue
+as briefed
+ring NOT re-solved automatically
+STRATUM oﬀers the re-plan
+Separation
+advisory
+θ_min prevents it —
+cannot be committed
+advisory + HOLD ALL oﬀered
+no autonomous manoeuvre geometrically unreachable
+GNSS accuracy
+degrades preﬂight gate blocks R_req grows; a compliant
+geometry may now advise
+correct behaviour — the operator
+is told why the advisory appeared
+The centre column is the architecture's load test: every entry is amber or better without the link. That is decision D1's payoﬀ, collected.
+Figure 17 — Degraded-mode behaviour map. Green = fault contained before anything moves. Amber = mission degraded,
+airframes safe. Red = requires conﬁguration the stock ﬁrmware does not supply, and is therefore closed by decision D8 rather
+than by hope.
+8.1 The one entry that is not self-closing
+Battery failsafe is uncoordinated by design: no mode-aware deferral exists in the firmware, and none is proposed. A critical-
+battery event will act on whatever nav state the vehicle is in, independently of the other two. The architectural response is not
+to suppress it — suppressing a battery failsafe to preserve a formation is an inversion of priorities — but to make it visible
+early. STRATUM must display remaining endurance per agent against the planned run-in and hold duration, so that the
+operator sees it coming rather than discovering it.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 20
+
+
+===== PAGE 22 =====
+9 Firmware deltas and implementation staging
+9.1 Firmware deltas required
+FOR VERSION 1: NONE
+The architecture rides entirely on the existing 31010 contract, the existing Standoff mode, the existing request_hold_mode()
+hand-off, and the existing STDF_SEQ staging. Everything that must change is either a STRATUM addition or a parameter value.
+This is the strongest single argument for the design, and it is the reason the verification burden is tractable.
+Non-blocking firmware candidates, recorded here so they are not rediscovered later:
+A sequence or echo identifier on standoff_setpoint would let STRATUM confirm which setpoint a vehicle is flying,
+not merely that one was accepted. Useful when re-slotting under a degraded link, where an unacknowledged re-command
+and a stale one are currently indistinguishable.
+The asymmetry between EngagementDive — which, on target loss, levels and waits under the same nav state with no
+self-abort — and VisionEngagement, which self-aborts to nav_state 16, should be resolved before any multi-vehicle
+engagement is contemplated. It is out of scope for v1 and blocking for §11.5.
+9.2 Staging
+STAGING — TECHNICAL RISK IS CONCENTRATED IN S0–S2
+technical risk execution
+S0 multi-instance SITL
+3× distinct MAV_SYS_ID exit: three vehicles visible and independently commandable
+S1 Orchestration module skeleton
+manager · agents · ring · slots exit: three concurrent standoﬀs on three bearings, from code
+S2 planner — assignment solver, transit levels,
+commit schedule, FailsafeVeriﬁer exit: deconﬂicted run-in veriﬁed by log analysis of pairwise separation
+S3 wizard and map UI · θ_min constraint · status strip exit: operator ﬂies it end to end
+S4 SeparationMonitor · advisories · HOLD ALL · degraded-mode handling exit: fault matrix passes
+S5 ﬂight test — three-vehicle ring ﬂown; measured minimum separation and arrival skew recorded against prediction
+the prediction is the deliverable being tested, not merely the ﬂight
+Figure 18 — Implementation staging. S0's exit criterion is deliberately a real multi-instance SITL run rather than a static
+argument, because the ﬁrmware documentation itself records that these custom modes were statically reviewed but never
+compile-veriﬁed in the environment that produced them.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 21
+
+
+===== PAGE 23 =====
+10 Risk register
+# Risk Class Mitigation
+R1 MAV_SYS_ID collision across shipped
+airframes — the second vehicle
+silently never appears, and the
+symptom resembles a radio fault
+Production
+conﬁguration
+D9 — per-airframe conﬁguration item in the
+build and acceptance procedure; STRATUM
+detects and refuses
+R2 NAV_DLL_ACT = 0 default — datalink
+loss triggers no action at all
+Systemic, latent D8 — veriﬁed parameter block gates ARM
+R3 NAV_RCL_ACT = 2 default with no
+auto-mode exception — three
+uncoordinated RTLs from a ring
+Systemic, emergent D8 — Hold, or exception bit set; stratiﬁed
+RTL_RETURN_ALT if RTL is retained
+R4 STDF_SEQ ∈ {2,4} silently collapses
+the transit stratiﬁcation the safety
+argument depends on
+Design coupling D8 — STDF_SEQ declared deconﬂiction-
+critical and veriﬁed, never assumed
+R5 Custom MAVLink identiﬁers 42001–
+42006 are a project-local allocation
+Interoperability Accepted for now and documented; revisit
+before any mixed-dialect ﬂeet
+R6 The custom ﬁrmware modes were
+statically reviewed but, by their own
+documentation, never compile-veriﬁed
+in the environment that produced
+them
+Process S0 exit criterion is a real multi-instance SITL
+run
+R7 EngagementDive has no self-abort on
+target loss, unlike VisionEngagement
+Safety asymmetry Out of scope for v1; blocking for the ruling
+in §11.5
+R8 Ground-side orchestration raises C2
+link criticality from supervisory to
+mission-critical
+Architectural D1 + D4 — separation is guaranteed by
+geometry, so the link is not load-bearing for
+safety after commit. Figure 17 is the
+evidence.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 22
+
+
+===== PAGE 24 =====
+11 Open decisions requiring ruling
+These are not gaps. They are the points at which the architecture is deliberately parameterised pending an operational answer,
+and each is stated with the default the design will take if no ruling is given.
+§ Question Default if unruled What changes with the answer
+11.1 Common or per-slot hold height? Common H, distinct transit
+levels
+The wire contract already carries z
+per vehicle, so per-slot heights are
+trivially supported — but they change
+the sensor geometry and the
+endurance picture.
+11.2 Is arrival skew a requirement with a
+number?
+Best-eﬀort via staggered
+commit; skew measured and
+reported
+If "all three on station within T
+seconds" is real, state T and the v2
+speed trim moves from deferred into
+S3.
+11.3 Launch topology — single pad or
+dispersed?
+Single pad; departure
+separation in time as well as
+altitude
+Dispersed launch points make the
+cyclic-order assignment materially
+more useful and relax the departure
+schedule.
+11.4 On losing a vehicle mid-mission,
+does the ring re-solve?
+Hold as briefed; oﬀer the re-
+plan
+Automatic re-spacing of two survivors
+is implementable, but it is a re-
+commit under degraded conditions
+and should be an operator decision.
+11.5 Does an orchestrated standoﬀ
+ever transition to engagement?
+Excluded from this
+subsystem's remit
+The scoping question that matters
+most. Both capabilities live in the
+same application. Multi-vehicle
+coordination plus terminal
+engagement is a materially heavier
+safety case — a diﬀerent
+authorisation chain, a diﬀerent abort
+architecture, and a diﬀerent
+veriﬁcation burden, compounded by
+risk R7. It should be scoped in
+deliberately or excluded explicitly. It
+should not arrive by accident.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 23
+
+
+===== PAGE 25 =====
+A Appendix — wire contract and parameter reference
+A.1 Standoﬀ command — DO_STANDOFF
+Unchanged from the single-vehicle contract. Sent once per vehicle; only param2 differs between the three.
+Field Value Notes
+command 31010 MAV_CMD_USER_1, repurposed as DO_STANDOFF
+message COMMAND_INT Preserves 1e7 lat/lon precision. COMMAND_LONG works but
+loses it.
+frame MAV_FRAME_GLOBAL_RELATIVE_ALT (6) Must be a global frame. A local frame scales x/y by 1e4
+and corrupts the target.
+x target latitude × 1e7 The target, not the hold point
+y target longitude × 1e7 —
+z H — height above home [m] Relative, not AMSL; PX4 adds home altitude
+param1 R — standoff distance [m] Common to all three vehicles
+param2 θ_i — bearing [deg, 0 = N, CW] The only ﬁeld that diﬀers per vehicle
+param3 0 —
+param4 NaN Let PX4 choose ﬁnal yaw; it faces the target
+ack ACCEPTED / DENIED Immediate; DENIED when lat/lon are not ﬁnite. Addressed to
+the originating sysid/compid.
+A.2 Mode selection and supporting commands
+Command Parameters Use
+DO_SET_MODE (176) base_mode | CUSTOM_MODE_ENABLED
+main = 4 (AUTO), sub = 20
+Enter Standoﬀ. Sub-mode value must be 20.
+DO_CHANGE_SPEED (178) groundspeed [m/s] v2 arrival trim. Send only after nav_state
+9 is conﬁrmed — on_activation calls
+reset_cruising_speed().
+NAV_TAKEOFF / DO_REPOSITION transit level Climb to the per-vehicle transit level before
+commit.
+HEARTBEAT custom_mode = (sub<<24) | (main<<16) Mode read-back; the source of the 9 → 3
+arrival transition.
+GLOBAL_POSITION_INT lat, lon, alt, vx, vy, vz Position and velocity for the separation
+monitor.
+GPS_RAW_INT h_acc, v_acc (extension fields) Accuracy input to R_req. Zero is treated as
+"not provided", not as zero error.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 24
+
+
+===== PAGE 26 =====
+A.3 Nav states and sub-modes in the Dagger ﬁrmware
+Mode nav_state custom sub-mode Slot origin
+Standoﬀ 9 20 reused FREE3
+Engagement 11 21 reused unused slot
+Abort 16 22 reused FREE1
+Vision Engagement 31 23 appended
+PN Engagement — 24 appended
+Hold (arrival target) 3 3 stock AUTO_LOITER
+A.4 Parameters referenced by this architecture
+Parameter Default Role in this architecture
+STDF_SEQ 1 Deconﬂiction-critical. Must be 1 or 3. Values 2 and 4 set
+approach_with_height = true.
+NAV_DLL_ACT 0 (disabled) Must be made explicit and non-zero — D8.
+NAV_RCL_ACT 2 (Return) Must be Hold, or COM_RCL_EXCEPT bit 1 set — D8.
+COM_RCL_EXCEPT 0 Auto-mode exception bit for RC loss.
+COM_DLL_EXCEPT 0 Auto-mode exception bit for datalink loss.
+RTL_RETURN_ALT stock Stratify per vehicle if RTL is retained as the loss action.
+MAV_SYS_ID 1 Must be unique per airframe — D9, risk R1.
+NAV_ACC_RAD stock APPROACH acceptance; second clause of the arrival predicate.
+NAV_MC_ALT_RAD stock HEIGHT acceptance; third clause of the arrival predicate.
+MIS_YAW_ERR / MIS_YAW_TMT stock HEADING phase acceptance and its timeout bound.
+MPC_YAW_MODE — Set to 3 (towards waypoint) to keep the nose on target throughout
+the approach.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 25
+
+
+===== PAGE 27 =====
+A.5 Source references
+Location What it establishes
+STRATUM · FlyViewWidgetLayer.qml:266–444 Set Standoﬀ panel; the existing operator entry point
+STRATUM · StandoffController.qml Single-instance controller bound to activeVehicle
+STRATUM · Vehicle.cc:1927 guidedModeStandoff; range check against a shared setting
+STRATUM · Vehicle.cc:266 MavCommandQueue constructed per vehicle
+STRATUM · PX4FirmwarePlugin.cc:447 31010 emission with the parameter mapping in A.1
+STRATUM · FlyViewMap.qml:427–436, 463–479 Map already iterates all vehicles; per-vehicle
+PlanMasterController
+STRATUM · MultiVehicleManager.cc:99 Multi-vehicle gate; multiVehicleEnabled() not overridden
+STRATUM · commit 6df2bc3 GNSS horizontalAccuracy / verticalAccuracy facts
+STRATUM · commit d2d616a Per-vehicle link enumeration idiom
+PX4-NX · mavlink_receiver.cpp:536, 832 31010 constant; decode, publish and ack
+PX4-NX · navigator/standoff.cpp:117, 139, 238, 388 Re-command restart; hold hand-oﬀ; latched approach altitude;
+cruising speed
+PX4-NX · commander/failsafe/failsafe.cpp:504–542 Custom modes bucketed under the generic AutoModes
+exception
+PX4-NX · docs_standoff_mode.md Design rationale, phase staging, veriﬁcation status
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 26
+
+
+===== PAGE 28 =====
+B Closing argument
+Because PX4 owns the standoff geometry, STRATUM does not need a trajectory generator; it needs a scheduler
+and a constraint. Because the firmware latches the run-in altitude at mode activation, vertical deconfliction is
+available for the price of one climb command. And because the ring geometry separates the terminal stations by
+hundreds of metres, the 1 m bubble was guarding the one phase of flight that was never in danger.
+The scan changed three things about this design, and each change made it smaller. That is usually the sign of an architecture
+converging on the grain of the system rather than fighting it. The remaining decisions in §3 are then largely about restraint: not
+streaming setpoints, not commanding avoidance, not re-solving the ring under fire, not refactoring a working single-vehicle
+path to accommodate a new one.
+The residual risk is not in the flight geometry. It is in the failsafe parameter block, where the stock defaults would have three
+vehicles making independent, uncoordinated decisions at exactly the moment the ground station stops watching. That is why
+D8 is a gate rather than a recommendation, and why the preflight check reads back parameters instead of trusting them.
+Decisions dictate destiny.
+NXM-SW-ARCH-STRATUM-MVO-001 v0.2 · Nexam Systems · Company Proprietary · 03 September 2026
+Derived from a direct scan of STRATUM-Desktop @ 4095ba3 and PX4-Autopilot-NX. Decisions D1–D9 proposed for review; rulings 11.1–
+11.5 outstanding.
+NXM-SW-ARCH-STRATUM-MVO-001  ·  v0.2 STRATUM Multi-Vehicle Orchestration — Architecture Description
+Nexam Systems  ·  Company Proprietary 27

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Native Android rendering of resources/QGCLogoWhite.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="215"
+    android:viewportHeight="215">
+    <path android:fillColor="#C2C7CF" android:fillAlpha="0.45"
+        android:pathData="M48,150 L120,150 L168,126 L96,126 Z" />
+    <path android:fillColor="#C2C7CF" android:fillAlpha="0.72"
+        android:pathData="M48,120 L120,120 L168,96 L96,96 Z" />
+    <path android:fillColor="#C2C7CF"
+        android:pathData="M48,90 L120,90 L168,66 L96,66 Z" />
+</vector>

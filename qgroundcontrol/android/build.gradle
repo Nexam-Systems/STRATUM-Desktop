@@ -190,6 +190,8 @@ android {
     }
 
     defaultConfig {
+        // Keep the Java namespace for upstream classes; use the product ID for installation.
+        applicationId androidPackageName
         minSdk qgcConfigOrDefault('QGC_ANDROID_MIN_SDK_VERSION', qtMinSdkVersion).toInteger()
         targetSdk qgcConfigOrDefault('QGC_ANDROID_TARGET_SDK_VERSION', qtTargetSdkVersion).toInteger()
         ndk.abiFilters = qtTargetAbiList.split(",")
