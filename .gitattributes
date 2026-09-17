@@ -1,0 +1,57 @@
+# ============================================================================
+# STRATUM-Desktop line-ending & binary hygiene
+# Placed in the baseline so the MVO fork inherits it via `git merge upstream/main`
+# and line endings stay consistent across the seam (no whole-tree merge churn).
+# ============================================================================
+
+# Normalize all text to LF in the repository; check out native per platform.
+* text=auto eol=lf
+
+# Source / config — explicit text (belt-and-braces)
+*.cc  text
+*.cpp text
+*.h   text
+*.hpp text
+*.qml text
+*.js  text
+*.json text
+*.md  text
+*.txt text
+*.cmake text
+*.qrc text
+*.ui  text
+*.yml text
+*.yaml text
+*.sh  text eol=lf
+*.py  text
+*.svg text
+CMakeLists.txt text
+
+# Windows scripts keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries — never apply EOL conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.pptx binary
+*.ppt binary
+*.docx binary
+*.doc binary
+*.xlsx binary
+*.zip binary
+*.7z  binary
+*.gz  binary
+*.exe binary
+*.dll binary
+*.so  binary
+*.dylib binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
